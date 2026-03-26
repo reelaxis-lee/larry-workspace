@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "skills": {
+    "proactive-agent-lite": {
+      "version": "1.0.0",
+      "installedAt": 1773340810070
+    },
+    "self-improving-agent": {
+      "version": "3.0.1",
+      "installedAt": 1773340812569
+    },
+    "skill-vetter": {
+      "version": "1.0.0",
+      "installedAt": 1773340816094
+    },
+    "email-best-practices": {
+      "version": "1.0.0",
+      "installedAt": 1773340819349
+    },
+    "imap-smtp-email": {
+      "version": "0.0.9",
+      "installedAt": 1773340824802
+    }
+  }
+}

@@ -1,0 +1,26 @@
+# Secrets
+.env
+.env.*
+
+# Profile data (private — never commit)
+profiles/*/browser-context/
+profiles/*/leads/
+profiles/*/HISTORY.md
+profiles/*/intake.json
+profiles/*/ACCOUNT.md.bak.*
+
+# Node
+node_modules/
+
+# Logs
+logs/
+*.log
+*.png
+
+# OS
+.DS_Store
+
+# Temp scripts
+scripts/verify-*.js
+scripts/save-nicole-search.js
+onboarding/
