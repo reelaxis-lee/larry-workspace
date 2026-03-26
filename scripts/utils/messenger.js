@@ -3,16 +3,32 @@
  * Used for connection requests, follow-ups, InMails, and post comments.
  */
 
-require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
+require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env'), override: true });
 const Anthropic = require('@anthropic-ai/sdk');
+const fs = require('fs');
+const path = require('path');
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// Load global rules — applied to every message generation call
+let GLOBAL_RULES = '';
+try {
+  GLOBAL_RULES = fs.readFileSync(
+    path.resolve(__dirname, '../../GLOBAL.md'), 'utf8'
+  );
+} catch (e) {
+  console.warn('[messenger] GLOBAL.md not found — no global rules applied');
+}
 
 /**
  * Generate a personalized connection request message (max 300 chars).
  */
 async function generateConnectionRequest(accountConfig, leadProfile) {
   const prompt = `You are writing a LinkedIn connection request for ${accountConfig.name}.
+
+=== GLOBAL RULES (override everything else) ===
+${GLOBAL_RULES}
+=== END GLOBAL RULES ===
 
 ABOUT ${accountConfig.name.toUpperCase()}:
 ${accountConfig.offerDescription}
@@ -37,10 +53,7 @@ RULES:
 - Reference a specific detail from the lead's profile
 - No pitch in connection requests — just connect
 - No links
-- Use -- instead of em dashes
-- Max 1 exclamation point
 - Never start with "Hi [Name]" every time — vary openers
-- No synergy, leverage, circle back, touch base, cutting-edge
 
 BANNED PHRASES: ${accountConfig.bannedPhrases || 'synergy, leverage, circle back, touch base, cutting-edge'}
 
@@ -69,6 +82,10 @@ Write ONLY the message text. Nothing else. No quotes, no explanation.`;
 async function generateFollowUp(accountConfig, leadProfile) {
   const prompt = `You are writing a LinkedIn follow-up message for ${accountConfig.name}, sent after a connection request was accepted.
 
+=== GLOBAL RULES (override everything else) ===
+${GLOBAL_RULES}
+=== END GLOBAL RULES ===
+
 ABOUT ${accountConfig.name.toUpperCase()}:
 ${accountConfig.offerDescription}
 
@@ -89,8 +106,6 @@ RULES:
 - Soft offer — no hard sell
 - No links
 - No "I'd love to hop on a quick call"
-- Use -- instead of em dashes
-- No synergy, leverage, or corporate speak
 
 Write ONLY the message text. Nothing else.`;
 
@@ -108,6 +123,10 @@ Write ONLY the message text. Nothing else.`;
  */
 async function generateInMail(accountConfig, leadProfile) {
   const prompt = `You are writing a LinkedIn InMail for ${accountConfig.name}.
+
+=== GLOBAL RULES (override everything else) ===
+${GLOBAL_RULES}
+=== END GLOBAL RULES ===
 
 ABOUT ${accountConfig.name.toUpperCase()}:
 ${accountConfig.offerDescription}
@@ -129,8 +148,7 @@ RULES:
 - Body: under 120 words
 - One clear CTA — not multiple questions
 - No links unless account config says otherwise
-- Do NOT include a sign-off/name (auto-signature handles it)
-- Use -- instead of em dashes
+- ${accountConfig.hasAutoSignature ? 'Do NOT include a sign-off — auto-signature is appended' : 'Include a natural sign-off'}
 
 Return in this exact format:
 SUBJECT: [subject line]
@@ -158,8 +176,15 @@ BODY: [message body]`;
 async function generatePostComment(accountConfig, postContent, postAuthor) {
   const prompt = `You are writing a LinkedIn comment for ${accountConfig.name}.
 
+=== GLOBAL RULES (override everything else) ===
+${GLOBAL_RULES}
+=== END GLOBAL RULES ===
+
 VOICE & TONE:
 ${accountConfig.voiceTone}
+
+POST ENGAGEMENT GUIDANCE:
+${accountConfig.postEngagementGuidance}
 
 POST AUTHOR: ${postAuthor}
 POST CONTENT: ${postContent}
@@ -170,7 +195,6 @@ RULES:
 - Sounds like a real person, not a marketer
 - Never generic ("Great post!", "So true!", "Love this!")
 - No self-promotion
-- Matches the account's voice
 
 Write ONLY the comment text. Nothing else.`;
 
