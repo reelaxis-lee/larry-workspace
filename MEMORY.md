@@ -165,6 +165,12 @@ Fully autonomous LinkedIn outreach system managing 24 LinkedIn profiles. Runs da
 | 2026-03-26 | First client profile onboarded: Nicole DeLutio (OpGen Media) |
 | 2026-03-26 | Standard process: raw Sales Nav URLs must be saved via save-search.js before use |
 | 2026-03-26 | Nicole fully ready: browser context + ACCOUNT.md + savedSearchId=1985871018 |
+| 2026-03-26 | Chris re-onboarded via intake tool — new ACCOUNT.md + templates generated |
+| 2026-03-26 | Onboarding now generates Claude message templates on intake complete |
+| 2026-03-26 | Onboarding /intake endpoint now backs up existing ACCOUNT.md before overwrite |
+| 2026-03-26 | Workspace pushed to private GitHub repo: reelaxis-lee/larry-workspace |
+| 2026-03-26 | TOOLS.md corrected — all sessions use Playwright persistent contexts, not Chrome native profiles |
+| 2026-03-26 | Confirmed: all sessions headless: false, channel: chrome across all scripts |
 
 ---
 
@@ -294,6 +300,14 @@ When a Sales Nav URL is provided for a new profile:
    
 **Why this matters:** Raw query URLs include a `sessionId` parameter that expires. Saved searches persist indefinitely and return a stable `savedSearchId` URL that works reliably every run.
 
+### Message Template Generation (added 2026-03-26)
+When intake completes, webhook server calls Claude (claude-sonnet-4-5) to generate:
+- Connection request (under 300 chars, A/B variants)
+- Follow-up message (under 100 words, A/B variants)
+- InMail subject line + body (under 120 words)
+Templates are voice-matched from intake data and written directly into ACCOUNT.md.
+Requires `dotenv` with `override: true` so it uses `.env` key, not OpenClaw's env.
+
 ### What Claude Collects (and enforces)
 - Only 5 areas in scope (listed above)
 - Hard blocks on: daily limits, workflow/process questions, cross-account references
@@ -354,7 +368,7 @@ Nickname derivation mismatch: chat step derives from first name ("nicole"), logi
 | Nickname | Full Name | Company | Timezone | Status |
 |----------|-----------|---------|----------|--------|
 | darren | Darren Duffy | ReelAxis | America/Los_Angeles | ✅ Active (Sales Nav exhausted — needs new search) |
-| chris | Chris Lee | getnarrow.ai | America/Los_Angeles | ✅ Active |
+| chris | Chris Lee | getnarrow.ai | America/Los_Angeles | ✅ Active — savedSearchId=1985861058, templates generated |
 | nicolepindul | Nicole DeLutio | OpGen Media | America/New_York | ✅ Ready — savedSearchId=1985871018 |
 
 ### Nicole DeLutio — Profile Notes
