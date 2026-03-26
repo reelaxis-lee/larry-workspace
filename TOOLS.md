@@ -5,13 +5,21 @@
 - **Working dir:** `~/.openclaw/workspace/`
 - **Node:** v24.14.0
 
-## Chrome Profiles
-- `Profile 1` → Darren Duffy (ReelAxis) — `/Users/darrenduffy/Library/Application Support/Google/Chrome/Profile 1`
-- `Profile 2` → Chris Lee (getnarrow.ai) — `/Users/darrenduffy/Library/Application Support/Google/Chrome/Profile 2`
+## Browser Sessions (how it actually works)
 
-## Playwright Browser Contexts
-- Stored per profile: `profiles/[name]/browser-context/`
-- Setup script: `node scripts/setup-profile.js <nickname>` — one-time human login
+Each LinkedIn account uses a **Playwright persistent context** — an isolated browser environment with its own cookies, localStorage, and session. Chrome's native profile system (Profile 1, Profile 2, etc.) is NOT used by the automation.
+
+| Profile | Context directory |
+|---------|------------------|
+| darren | `profiles/darren/browser-context/` |
+| chris | `profiles/chris/browser-context/` |
+| nicolepindul | `profiles/nicolepindul/browser-context/` |
+
+When a session runs, Playwright launches Chrome with `--user-data-dir=profiles/<nickname>/browser-context/`. Each account is fully isolated — Chrome has no knowledge of the other accounts.
+
+Sessions are created either via:
+- `node scripts/setup-profile.js <nickname>` — manual one-time login (fallback)
+- The onboarding app Step 2 — automated Playwright login (standard path)
 
 ## Profile Nicknames
 - `darren` → `profiles/darren/` — Darren Duffy, Pacific Time
