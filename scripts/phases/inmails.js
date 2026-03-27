@@ -18,6 +18,8 @@ async function runInMails(page, config, results) {
   let sent = 0;
   let checked = 0;
   const maxCheck = 20;
+  let consecutiveErrors = 0;
+  const maxConsecutiveErrors = 5; // bail out if every lead is failing
 
   console.log(`[${config.nickname}] InMails — target: ${target} open profiles`);
 
@@ -38,6 +40,10 @@ async function runInMails(page, config, results) {
 
     for (const lead of leads) {
       if (sent >= target || checked >= maxCheck) break;
+      if (consecutiveErrors >= maxConsecutiveErrors) {
+        console.log(`[${config.nickname}] InMails — ${maxConsecutiveErrors} consecutive errors, bailing out`);
+        return;
+      }
 
       try {
         const name = (await lead.locator('[data-anonymize="person-name"]').first()
@@ -60,9 +66,9 @@ async function runInMails(page, config, results) {
         const msgBtn = lead.locator('button[aria-label^="Message "]').first();
         if (!await msgBtn.isVisible({ timeout: 4000 }).catch(() => false)) continue;
 
-        await msgBtn.click();
+        checked++; // increment before click so a failed click still counts
+        await msgBtn.click({ timeout: 8000 }); // short timeout — if it doesn't click fast, skip
         await sleep(randomBetween(2000, 3000));
-        checked++;
 
         // Check if it's a paid InMail (credit counter button appears)
         const isPaid = await page.locator('button[aria-label*="InMail credits renewal"]').isVisible({ timeout: 2000 }).catch(() => false);
@@ -129,8 +135,9 @@ async function runInMails(page, config, results) {
         }
 
         if (sendEnabled) {
-          await sendBtn.click();
+          await sendBtn.click({ timeout: 8000 });
           sent++;
+          consecutiveErrors = 0; // reset on success
           results.messagessent = (results.messagessent || 0) + 1;
           console.log(`[${config.nickname}] ✅ InMail sent to ${name} (${sent}/${target}): "${inmail.subject}"`);
           await sleep(randomBetween(1500, 2500));
@@ -138,11 +145,13 @@ async function runInMails(page, config, results) {
           await delays.betweenInMails();
         } else {
           console.log(`[${config.nickname}] Send button never enabled for ${name}`);
+          consecutiveErrors++;
           await closeConversation(page, name);
         }
 
       } catch (err) {
-        console.log(`[${config.nickname}] InMail error: ${err.message.substring(0, 80)}`);
+        consecutiveErrors++;
+        console.log(`[${config.nickname}] InMail error (${consecutiveErrors}/${maxConsecutiveErrors}): ${err.message.substring(0, 80)}`);
         await page.keyboard.press('Escape').catch(() => {});
         await sleep(randomBetween(2000, 3000));
       }
