@@ -74,15 +74,18 @@ async function runFollowUps(page, config, results) {
         continue;
       }
 
-      // Find Message button on their profile — LinkedIn uses <a aria-label="Message"> on profiles
-      const msgBtn = page.locator('a[aria-label="Message"], button[aria-label="Message"], a:has-text("Message"), button:has-text("Message")').first();
+      // Find Message button on their profile
+      // LinkedIn uses aria-label="Message John Smith" (includes name) — use contains match
+      const msgBtn = page.locator(
+        'button[aria-label*="Message"], a[aria-label*="Message"]'
+      ).first();
       if (!await msgBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
         console.log(`[${config.nickname}] No Message button for ${name} — skipping`);
         await sleep(randomBetween(1000, 2000));
         continue;
       }
 
-      await msgBtn.click();
+      await msgBtn.click({ timeout: 8000 });
       await sleep(randomBetween(1500, 2500));
 
       // Type in the compose box — LinkedIn messaging uses contenteditable
@@ -185,13 +188,15 @@ async function extractQualifiedConnections(page) {
       if (!href || seen.has(href)) continue;
       seen.add(href);
 
-      // Extract name — look for the profile link's aria-label or nearest span
-      const name = profileLink.getAttribute('aria-label') ||
-        (card.querySelector('[data-anonymize="person-name"], strong, h3') || {}).textContent || '';
+      // Extract name — aria-label is "View John Smith's profile" so strip it
+      const rawAriaLabel = profileLink.getAttribute('aria-label') || '';
+      const ariaName = rawAriaLabel.replace(/^View\s+/i, '').replace(/'s\s+profile.*$/i, '').trim();
+      const nameFromEl = (card.querySelector('[data-anonymize="person-name"], strong, h3') || {}).textContent || '';
+      const name = ariaName || nameFromEl;
 
-      // Headline/title
-      const titleEl = card.querySelector('p:not(:first-child)') ||
-        card.querySelector('span.t-14, .t-black--light');
+      // Headline/title — skip the "Connected on" paragraph
+      const allParas = [...card.querySelectorAll('p')];
+      const titleEl = allParas.find(p => !p.textContent.includes('Connected on'));
       const title = titleEl ? titleEl.textContent.trim() : '';
 
       results.push({ name: name.trim(), title: title.trim(), href, dateText });
