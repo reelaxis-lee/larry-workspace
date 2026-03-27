@@ -84,7 +84,7 @@ const FROM_EMAIL = process.env.POSTMARK_FROM || 'larry@getnarrow.ai';
 async function sendSessionReport(accountConfig, sessionResults) {
   const {
     date,
-    connectionssent = 0,
+    connectionsent = 0,
     messagessent = 0,
     postLikes = 0,
     postComments = 0,
@@ -215,4 +215,4 @@ function logToHistory(accountConfig, sessionResults) {
   console.log(`[report] History logged to ${historyPath}`);
 }
 
-module.exports = { sendSessionReport, logToHistory };
+module.exports = { sendSessionReport, logToHistory, postSlackReport };
