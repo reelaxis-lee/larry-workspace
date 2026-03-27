@@ -12,7 +12,7 @@
 | LinkedIn email | [set before first run] |
 | Chrome profile path | profiles/nicolepindul/browser-context/ (auto-managed by Playwright) |
 | Customer report email | teamred@reelaxis.com |
-| Timezone | America/New_York (Eastern) |
+| Timezone | America/New_York |
 | Persona location | Toms River, NJ |
 | Bright Data zone | [to be configured] |
 | Bright Data proxy URL | [to be configured] |
@@ -45,7 +45,7 @@
 
 | Field | Value |
 |-------|-------|
-| Timezone | America/New_York (Eastern) |
+| Timezone | America/New_York |
 | Earliest start | 7:00 AM ET |
 | Latest start | Must complete by 11:00 PM ET |
 | Target session length | 45–60 min |

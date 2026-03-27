@@ -264,6 +264,54 @@ INMAIL_BODY:
   }
 }
 
+// Map common timezone aliases → valid IANA strings
+const TIMEZONE_MAP = {
+  'eastern':             'America/New_York',
+  'eastern time':        'America/New_York',
+  'et':                  'America/New_York',
+  'est':                 'America/New_York',
+  'edt':                 'America/New_York',
+  'central':             'America/Chicago',
+  'central time':        'America/Chicago',
+  'ct':                  'America/Chicago',
+  'cst':                 'America/Chicago',
+  'cdt':                 'America/Chicago',
+  'mountain':            'America/Denver',
+  'mountain time':       'America/Denver',
+  'mt':                  'America/Denver',
+  'mst':                 'America/Denver',
+  'mdt':                 'America/Denver',
+  'pacific':             'America/Los_Angeles',
+  'pacific time':        'America/Los_Angeles',
+  'pt':                  'America/Los_Angeles',
+  'pst':                 'America/Los_Angeles',
+  'pdt':                 'America/Los_Angeles',
+  'alaska':              'America/Anchorage',
+  'hawaii':              'Pacific/Honolulu',
+  'utc':                 'UTC',
+  'gmt':                 'UTC',
+};
+
+function normalizeTimezone(raw) {
+  if (!raw) return 'America/Los_Angeles';
+  const trimmed = raw.trim();
+
+  // Already a valid IANA string (contains slash, no spaces beyond the slash)
+  if (/^[A-Za-z]+\/[A-Za-z_]+$/.test(trimmed)) return trimmed;
+
+  // Strip parenthetical suffixes: "America/New_York (Eastern)" → "America/New_York"
+  const stripped = trimmed.replace(/\s*\(.*?\)\s*/g, '').trim();
+  if (/^[A-Za-z]+\/[A-Za-z_]+$/.test(stripped)) return stripped;
+
+  // Try alias lookup (case-insensitive)
+  const lookup = stripped.toLowerCase();
+  if (TIMEZONE_MAP[lookup]) return TIMEZONE_MAP[lookup];
+
+  // Fallback
+  console.warn(`[webhook] Unknown timezone "${raw}" — defaulting to America/Los_Angeles`);
+  return 'America/Los_Angeles';
+}
+
 function generateAccountMd(nickname, i, templates) {
   const titles = (i.icp?.titles || []).join(', ') || 'Not specified';
   const industries = (i.icp?.industries || []).join(', ') || 'Not specified';
@@ -285,7 +333,7 @@ function generateAccountMd(nickname, i, templates) {
 | LinkedIn email | ${i.email || '[set before first run]'} |
 | Chrome profile path | [to be configured] |
 | Customer report email | ${i.email || '[set before first run]'} |
-| Timezone | ${i.timezone || 'America/Los_Angeles'} |
+| Timezone | ${normalizeTimezone(i.timezone)} |
 | Persona location | ${i.city || 'Not specified'} |
 | Bright Data zone | [to be configured] |
 | Bright Data proxy URL | [to be configured] |
@@ -318,7 +366,7 @@ function generateAccountMd(nickname, i, templates) {
 
 | Field | Value |
 |-------|-------|
-| Timezone | ${i.timezone || 'America/Los_Angeles'} |
+| Timezone | ${normalizeTimezone(i.timezone)} |
 | Earliest start | 7:00 AM local |
 | Latest start | Must complete by 11:00 PM local |
 | Target session length | 45–60 min |
