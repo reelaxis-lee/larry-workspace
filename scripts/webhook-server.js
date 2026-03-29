@@ -155,7 +155,13 @@ app.post('/intake', requireSecret, async (req, res) => {
     // Create blank HISTORY.md
     const historyPath = path.join(profileDir, 'HISTORY.md');
     if (!fs.existsSync(historyPath)) {
-      fs.writeFileSync(historyPath, `# Activity History — ${intake.name}\n\n| Date | Action | Target | Outcome |\n|------|--------|--------|---------|\n`);
+      const today = new Date().toISOString().split('T')[0];
+      fs.writeFileSync(historyPath,
+        `# Activity History — ${intake.name}\n\n` +
+        `| Date | Action |\n|------|--------|\n` +
+        `| ${today} | Profile created — intake complete |\n\n` +
+        `## Log\n`
+      );
     }
 
     console.log(`[webhook] ✅ Profile created for ${intake.name} → ${nickname}`);

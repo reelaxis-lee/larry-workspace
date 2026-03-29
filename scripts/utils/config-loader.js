@@ -67,7 +67,11 @@ function loadAccountConfig(nickname) {
     autoSignatureText: field('Signature text'),
 
     // Content for message generation
-    offerDescription: section('OFFER & CTA'),
+    offerDescription: (() => {
+      const offer = section('OFFER & VALUE PROP') || section('OFFER & CTA') || '';
+      const cta = section('CTA & MESSAGING') || '';
+      return [offer, cta].filter(Boolean).join('\n\n');
+    })(),
     voiceTone: section('TONE & VOICE'),
     followUpGuidance: section('FOLLOW-UP MESSAGE GUIDANCE'),
     inMailGuidance: section('INMAIL GUIDANCE'),
