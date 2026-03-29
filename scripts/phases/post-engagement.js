@@ -25,18 +25,15 @@ async function runPostEngagement(page, config, results) {
   const commentedPostIds = new Set();
 
   while ((liked < likeTarget || commented < commentTarget) && scrolls < maxScrolls) {
-    // Get all visible posts — single selector to avoid union double-matching
-    const rawPosts = await page.locator('[data-id^="urn:li:activity"]').all();
+    // LinkedIn removed data-id from feed posts — use role="listitem" as post container
+    const rawPosts = await page.locator('div[role="listitem"]').all();
 
-    // Deduplicate by data-id before processing (same element can match multiple times)
-    const seenThisBatch = new Set();
+    // Deduplicate by author+text key (no data-id available anymore)
     const posts = [];
     for (const p of rawPosts) {
-      const pid = await p.getAttribute('data-id').catch(() => null);
-      if (pid && !seenThisBatch.has(pid)) {
-        seenThisBatch.add(pid);
-        posts.push(p);
-      }
+      const ctrlLabel = await p.locator('button[aria-label^="Open control menu for post by"]')
+        .first().getAttribute('aria-label').catch(() => null);
+      if (ctrlLabel) posts.push(p); // only include actual feed posts (have control menu)
     }
 
     for (const post of posts) {
@@ -47,28 +44,27 @@ async function runPostEngagement(page, config, results) {
         const box = await post.boundingBox().catch(() => null);
         if (!box || box.y < 0 || box.y > 2000) continue;
 
-        // Get stable post ID to prevent duplicate actions
-        const postId = await post.getAttribute('data-id').catch(() => null)
-          || await post.getAttribute('id').catch(() => null)
-          || null;
-
-        // Get post text for context
-        const postText = (await post.locator('[data-ad-preview="MESSAGE"], .feed-shared-text, .update-components-text').first()
-          .textContent({ timeout: 2000 }).catch(() => '')).trim().substring(0, 400);
-
         // Parse author from control menu aria-label: "Open control menu for post by NAME"
         const ctrlBtn = post.locator('button[aria-label^="Open control menu for post by"]').first();
         const ctrlLabel = await ctrlBtn.getAttribute('aria-label').catch(() => '');
         const authorText = ctrlLabel?.replace('Open control menu for post by ', '').trim() || 'unknown';
 
+        // Get post text — use innerText of listitem, strip UI chrome
+        const postText = (await post.evaluate(el => el.innerText || '').catch(() => ''))
+          .replace(/Feed post|Like|Comment|Repost|Send|reactions?/g, '')
+          .trim().substring(0, 400);
+
+        // Use author as dedup key (simplest stable identifier without data-id)
+        const postId = ctrlLabel || authorText;
+
         if (!postText || postText.length < 20) continue;
 
-        // Like the post (if not already liked, not already processed, and under limit)
+        // Like the post — LinkedIn changed to aria-label="Reaction button state: no reaction"
+        // (no longer uses aria-pressed; "no reaction" = not yet liked)
         if (liked < likeTarget && postId && !likedPostIds.has(postId)) {
-          const likeBtn = post.locator('button[aria-label*="React Like"], button[aria-label*="Like"]').first();
-          const isLiked = await likeBtn.getAttribute('aria-pressed').catch(() => null);
+          const likeBtn = post.locator('button[aria-label*="Reaction button state: no reaction"]').first();
 
-          if (isLiked === 'false' && await likeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+          if (await likeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
             likedPostIds.add(postId);
             await likeBtn.click();
             liked++;
@@ -80,7 +76,8 @@ async function runPostEngagement(page, config, results) {
 
         // Comment (if not already commented on this post, under limit, post is substantial)
         if (commented < commentTarget && postText.length > 100 && postId && !commentedPostIds.has(postId)) {
-          const commentBtn = post.locator('button[aria-label*="comment" i], button:has-text("Comment")').first();
+          // Comment button now has no aria-label — match by text
+          const commentBtn = post.locator('button:has-text("Comment")').first();
           if (!await commentBtn.isVisible({ timeout: 1000 }).catch(() => false)) continue;
 
           // Secondary DOM check — look for profile name already in this post's comments
@@ -105,8 +102,9 @@ async function runPostEngagement(page, config, results) {
           await commentBtn.click();
           await sleep(randomBetween(1500, 2500));
 
-          // Scope editor to THIS post element — prevents writing into a previously open editor
-          const commentBox = post.locator('.ql-editor[contenteditable="true"]').first();
+          // LinkedIn switched from Quill (.ql-editor) to TipTap/ProseMirror
+          // New editor: aria-label="Text editor for creating comment"
+          const commentBox = post.locator('[aria-label="Text editor for creating comment"]').first();
           if (!await commentBox.isVisible({ timeout: 3000 }).catch(() => false)) {
             await page.keyboard.press('Escape');
             continue;
@@ -117,9 +115,10 @@ async function runPostEngagement(page, config, results) {
           await commentBox.type(comment, { delay: randomBetween(35, 75) });
           await sleep(randomBetween(1000, 1800));
 
-          // Scope submit button to THIS post element
-          const submitBtn = post.locator('button.comments-comment-box__submit-button--cr, .comments-comment-box__submit-button').first();
-          if (await submitBtn.isVisible({ timeout: 4000 }).catch(() => false)) {
+          // Submit button: LinkedIn now uses button:has-text("Submit") with disabled state
+          const submitBtn = post.locator('button:has-text("Submit")').first();
+          const submitEnabled = await submitBtn.isEnabled({ timeout: 3000 }).catch(() => false);
+          if (await submitBtn.isVisible({ timeout: 4000 }).catch(() => false) && submitEnabled) {
             await submitBtn.click();
             commented++;
             results.postComments = (results.postComments || 0) + 1;
