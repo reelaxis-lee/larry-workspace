@@ -112,22 +112,31 @@ async function runPostEngagement(page, config, results) {
 
           await commentBox.click();
           await sleep(randomBetween(500, 1000));
-          await commentBox.type(comment, { delay: randomBetween(35, 75) });
+          // TipTap/ProseMirror requires page-level keyboard events to update its internal state
+          // (element.type() doesn't trigger TipTap's event dispatcher reliably)
+          await page.keyboard.type(comment, { delay: randomBetween(35, 75) });
           await sleep(randomBetween(1000, 1800));
 
-          // Submit button: LinkedIn now uses button:has-text("Submit") with disabled state
-          const submitBtn = post.locator('button:has-text("Submit")').first();
-          const submitEnabled = await submitBtn.isEnabled({ timeout: 3000 }).catch(() => false);
-          if (await submitBtn.isVisible({ timeout: 4000 }).catch(() => false) && submitEnabled) {
-            await submitBtn.click();
+          // Submit button — scope to page level (button may render outside the listitem)
+          // Poll for enabled state (LinkedIn enables it after TipTap registers content)
+          const submitBtn = page.locator('button:has-text("Submit")').last();
+          let submitEnabled = false;
+          for (let attempt = 0; attempt < 8; attempt++) {
+            submitEnabled = await submitBtn.isEnabled({ timeout: 500 }).catch(() => false);
+            if (submitEnabled) break;
+            await sleep(300);
+          }
+
+          if (submitEnabled && await submitBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await submitBtn.click({ timeout: 5000 });
             commented++;
             results.postComments = (results.postComments || 0) + 1;
             console.log(`[${config.nickname}] Commented (${commented}/${commentTarget}): "${comment.substring(0, 60)}..."`);
-            // Force-close the editor after submitting
             await sleep(1000);
             await page.keyboard.press('Escape').catch(() => {});
             await delays.betweenComments();
           } else {
+            console.log(`[${config.nickname}] Submit button never enabled for post by ${authorText} — skipping`);
             await page.keyboard.press('Escape');
           }
         }
