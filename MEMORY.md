@@ -1,6 +1,6 @@
 # MEMORY.md — Larry's Long-Term Memory
 
-## Last Updated: 2026-03-26
+## Last Updated: 2026-03-31
 
 ---
 
@@ -8,7 +8,7 @@
 
 - Name: Larry, LinkedIn Specialist Agent
 - Running on: Darren's Mac Mini (this machine)
-- Managed by: Chris Lee (getnarrow.ai + ReelAxis)
+- Managed by: Chris Lee (getnarrow.ai + ReelAxis), Darren Duffy (ReelAxis)
 
 ---
 
@@ -22,7 +22,7 @@ Fully autonomous LinkedIn outreach system managing 24 LinkedIn profiles. Runs da
 - **Browser automation:** Playwright with real Chrome (not headless, not Chromium)
 - **Proxy:** Bright Data — one dedicated residential sticky session zone per profile
 - **Lead sources:** Sales Navigator (most profiles) + Seamless.ai (some profiles, CSV export or API)
-- **Logging:** Profile HISTORY.md files + daily Slack digest to Chris
+- **Logging:** Profile HISTORY.md files + daily Slack digest to Chris/Darren
 - **Reporting:**
   - Daily Slack post to #linkedin-updates (C0ALWJRPQ6R) after each session completes
   - Daily email to each customer (profile owner) via Postmark — sent immediately after their session
@@ -36,9 +36,9 @@ Fully autonomous LinkedIn outreach system managing 24 LinkedIn profiles. Runs da
 
 ### Authentication
 - Each profile has a persistent Playwright browser context stored in `profiles/[name]/browser-context/`
-- One-time human login per profile — session saved, reused every run
+- One-time human login per profile via onboarding app (or `setup-profile.js` manual fallback)
 - Proxy consistency is critical: same Bright Data zone per profile every time
-- If LinkedIn shows login screen or CAPTCHA → Larry stops and alerts Chris via Slack immediately
+- If LinkedIn shows login screen or CAPTCHA → Larry stops and alerts Darren via Slack immediately
 
 ---
 
@@ -46,15 +46,16 @@ Fully autonomous LinkedIn outreach system managing 24 LinkedIn profiles. Runs da
 
 ### Scheduling Rules
 - Operating window: **5am–11pm in the profile's local timezone** (never outside this)
-- Start times randomized within the window (no robot-exact 7:00:00am starts)
+- Scheduler fires at **5:00am PDT** daily (changed from 8:30am on 2026-03-30)
 - One profile at a time, sequentially — never two LinkedIn accounts open simultaneously
+- Lock file (`logs/scheduler.lock`) prevents parallel scheduler instances
 - Each profile session: **45–60 minutes** (randomized to look human)
 - Max profiles per day on one machine: ~16–18 (math: 16hr window ÷ ~52min avg)
 - 24 profiles: rotating schedule OR second Mac Mini
 
 ### Session Flow (per profile)
 ```
-1. Pre-flight: read account config, check if already run today
+1. Pre-flight: read account config, check if already run today (hasRunToday check)
 2. Launch Chrome via Playwright with profile's browser context + Bright Data proxy
 3. Verify correct LinkedIn account is logged in
 4. Inbox check: review messages, respond to warm leads, escalate hot ones
@@ -96,7 +97,7 @@ Fully autonomous LinkedIn outreach system managing 24 LinkedIn profiles. Runs da
 - Work results sequentially from top
 - Skip: 1st degree (already connected), flag 3rd degree as InMail candidates
 - Personalized connection request per profile read
-- Flag when search exhausted → alert Chris, wait for new search
+- Flag when search exhausted → alert Darren, wait for new search
 
 ### Playbook B: Seamless.ai
 - Read lead list from `profiles/[name]/leads/[filename].csv` OR pull via Seamless API
@@ -125,16 +126,16 @@ Fully autonomous LinkedIn outreach system managing 24 LinkedIn profiles. Runs da
     ACCOUNT.md          ← full config (identity, limits, ICP, offer, tone, proxy creds, playbook)
     browser-context/    ← Playwright persistent session (cookies, storage)
     leads/              ← Seamless.ai CSV drops (Playbook B only)
-    HISTORY.md          ← running log of all actions (date, action type, target, outcome)
+    HISTORY.md          ← running log of all actions — must contain "## Log" header for logToHistory() to work
 ```
 
 ---
 
 ## Pilot Plan
 
-- Start with **2–3 profiles** before scaling to 24
-- Active pilots: Darren (Chrome "Profile 1") + Chris (Chrome "Profile 2")
-- Validate full end-to-end flow before onboarding more accounts
+- 3 active pilots: Darren, Chris, Nicole
+- Running daily since ~March 17 (Darren + Chris), March 27+ (Nicole)
+- Validate + stabilize before onboarding more accounts
 
 ---
 
@@ -169,20 +170,25 @@ Fully autonomous LinkedIn outreach system managing 24 LinkedIn profiles. Runs da
 | 2026-03-26 | Onboarding now generates Claude message templates on intake complete |
 | 2026-03-26 | Onboarding /intake endpoint now backs up existing ACCOUNT.md before overwrite |
 | 2026-03-26 | Workspace pushed to private GitHub repo: reelaxis-lee/larry-workspace |
-| 2026-03-26 | TOOLS.md corrected — all sessions use Playwright persistent contexts, not Chrome native profiles |
-| 2026-03-26 | Confirmed: all sessions headless: false, channel: chrome across all scripts |
+| 2026-03-27 | Fixed follow-ups: name extraction (strip "View …'s profile" from aria-label) + Message button uses contains match `[aria-label*="Message"]` |
+| 2026-03-29 | Post engagement: LinkedIn switched feed structure — no more data-id, new selectors for post containers + like buttons |
+| 2026-03-29 | Fixed 3 onboarding bugs: offer section name mismatch, HISTORY.md missing ## Log header, hasRunToday() always false |
+| 2026-03-29 | Post engagement: LinkedIn switched from Quill to TipTap/ProseMirror editor — all comment selectors updated |
+| 2026-03-30 | Scheduler moved to 5:00am PDT (was 8:30am) so EDT profiles can run at 8am their time |
+| 2026-03-31 | Lock file added to scheduler — prevents two instances running simultaneously |
+| 2026-03-31 | Comments: TipTap requires page.keyboard.type() + page-level Submit button scope — fix deployed |
 
 ---
 
 ## People
 
 - **Chris Lee** — Boss. getnarrow.ai + ReelAxis. Oceanside/Carlsbad CA. Pacific Time.
-- **Darren Duffy** — First pilot profile. ReelAxis. San Diego. Chrome "Profile 1" on this machine.
+- **Darren Duffy** — First pilot profile + ops manager. ReelAxis. San Diego. Pacific Time.
 - **Nicole DeLutio** — First client profile (OpGen Media). Toms River, NJ. Eastern Time. Onboarded 2026-03-26.
 
 ---
 
-## Automation Stack — What's Built & Working (as of 2026-03-17)
+## Automation Stack — Current State (as of 2026-03-31)
 
 ### Scripts
 ```
@@ -190,23 +196,25 @@ scripts/
   run-profile.js          ← main session runner (orchestrates all phases)
   setup-profile.js        ← one-time login setup per profile (manual fallback)
   save-search.js          ← convert raw Sales Nav query URL → savedSearchId (run for new profiles)
-  scheduler.js            ← timezone-aware daily cron runner
+  scheduler.js            ← timezone-aware daily cron runner (lock file added 2026-03-31)
   phases/
     connect-salenav.js    ← Sales Nav connections ✅ WORKING
-    follow-ups.js         ← follow-up messages to accepted connections ✅ built, untested
-    post-engagement.js    ← likes + comments on feed ✅ WORKING
-    inmails.js            ← InMails to open profiles ✅ WORKING (fixed 2026-03-17)
+    follow-ups.js         ← follow-up messages to accepted connections ✅ WORKING (fixed 2026-03-27)
+    post-engagement.js    ← likes + comments ✅ Likes WORKING / Comments fix deployed 2026-03-31 (pending confirm)
+    inmails.js            ← InMails to open profiles ✅ WORKING (fixed 2026-03-17, timeout guard added)
   utils/
     browser.js            ← Chrome launch, session verify, delays
-    config-loader.js      ← loads ACCOUNT.md per profile
+    config-loader.js      ← loads ACCOUNT.md per profile (offer section fix 2026-03-29)
     messenger.js          ← Claude API for message/comment generation
     report.js             ← Postmark email + HISTORY.md logging + Slack post
+  webhook-server.js       ← Express server (port 3743) — intake + login endpoints
+  linkedin-login.js       ← Playwright login with 2FA back-channel
+  start-webhook.js        ← starts server + cloudflare tunnel + updates Vercel env vars
 ```
 
-### LaunchAgent
-- Plist: `/Users/darrenduffy/Library/LaunchAgents/ai.getnarrow.larry.plist`
-- Fires scheduler.js at 8:30am daily
-- Scheduler checks profile timezones and skips if outside 5am–11pm window
+### LaunchAgents
+- `ai.getnarrow.larry.plist` → fires `scheduler.js` at **5:00am daily**
+- `ai.getnarrow.webhook.plist` → runs `start-webhook.js` at boot
 
 ### Verified Selectors (Sales Navigator)
 - Lead cards: `[data-x-search-result="LEAD"]`
@@ -217,7 +225,7 @@ scripts/
 - Degree badge: `.artdeco-entity-lockup__degree` (text: "· 2nd", "· 1st", "· 3rd")
 - Next page: `button[aria-label="Next"]`
 
-### Connection Request Flow (VERIFIED WORKING 2026-03-13)
+### Connection Request Flow (VERIFIED WORKING)
 1. Read lead data + degree from card
 2. Skip 1st degree, flag 3rd degree as InMail candidate
 3. Generate personalized message via Claude
@@ -226,20 +234,27 @@ scripts/
 6. Click `li:has-text("Connect"):not(:has-text("View")):not(:has-text("Copy"))`
 7. Fill invite dialog textarea → Send
 
-### Post Engagement Flow (VERIFIED WORKING 2026-03-13)
-- Post selector: `[data-id^="urn:li:activity"]`
-- Dedup by `data-id` before processing
-- Like: `button[aria-label*="React Like"]` where `aria-pressed="false"`
-- Comment editor: `.ql-editor[contenteditable="true"]` — scoped to post element
-- Submit: `button.comments-comment-box__submit-button--cr` — scoped to post
-- Escape before/after each comment to close open editors
+### Post Engagement Flow (UPDATED 2026-03-29/31 — LinkedIn feed structure changed)
+- Post containers: `div[role="listitem"]` (no more `data-id` attributes)
+- Skip non-post list items: verify `button[aria-label^="Open control menu for post by"]` exists
+- Like: `button[aria-label*="Reaction button state: no reaction"]` (was `aria-pressed="false"`)
+- Comment button: `button:has-text("Comment")` scoped to post
+- Comment editor: `[aria-label="Text editor for creating comment"]` (LinkedIn switched from Quill to **TipTap/ProseMirror**)
+- Typing into editor: `page.keyboard.type()` at page level (NOT `element.type()` — TipTap requires page-level keyboard events)
+- Submit button: `page.locator('button:has-text("Submit")').last()` at page level (may render outside listitem)
+- Submit polling: up to 8x / 300ms to wait for enabled state
 
-### InMail Flow (VERIFIED WORKING 2026-03-17)
+### Follow-up Message Flow (FIXED 2026-03-27)
+- Name extraction: `profileLink.getAttribute('aria-label')` → strip `"View "` prefix + `"'s profile"` suffix
+- Message button: `[aria-label*="Message"]` (contains match — button includes person's name in aria-label)
+- 3-day wait rule: only message connections accepted 3+ days ago
+
+### InMail Flow (VERIFIED WORKING — fixed 2026-03-17)
 1. Navigate to Sales Nav search, wait 7–10s for buttons to render
 2. Find leads with `button[aria-label^="Message "]` (isVisible timeout: 4000ms)
 3. Skip non-Open Profiles (check for `button[aria-label*="InMail credits renewal"]`)
 4. Click Message button → compose overlay opens
-5. Fill subject via `.type()` with per-char delay (triggers LinkedIn change events)
+5. Fill subject via `.type()` with per-char delay
 6. Tab from subject into body to dismiss "draft with AI" ghost overlay
 7. If still blocked: `click({ force: true })` on `textarea[name="message"]`
 8. Type body content via `.type()` with per-char delay
@@ -275,6 +290,7 @@ New accounts onboard via a Claude-powered chat app — fully self-service, zero 
 3. On chat completion:
    - **Vercel POSTs intake JSON to Mac Mini webhook** (`POST /intake`)
    - Mac Mini auto-creates `profiles/<nickname>/ACCOUNT.md`, `HISTORY.md`, `intake.json`
+   - HISTORY.md includes `## Log` header (required by logToHistory())
    - Slack notification to #linkedin-updates with profile summary + what's still needed
    - Postmark email backup sent to darren@reelaxis.com
 4. Step 2 appears in UI: client enters LinkedIn email + password
@@ -289,30 +305,47 @@ New accounts onboard via a Claude-powered chat app — fully self-service, zero 
 ### Sales Nav URL Handling (Standard Process)
 When a Sales Nav URL is provided for a new profile:
 1. **If it contains `savedSearchId=`** — use it directly in ACCOUNT.md. Done.
-2. **If it's a raw query URL** (contains `query=` or `recentSearchParam`) — run `scripts/save-nicole-search.js` pattern:
+2. **If it's a raw query URL** (contains `query=` or `recentSearchParam`) — run `scripts/save-search.js` pattern:
    - Launch Playwright with the profile's browser context
    - Navigate to the raw URL
    - Click the "Save search" toggle in the left sidebar
    - Fill in a descriptive name: `"[Name] ICP — [short description]"`
    - Capture the `savedSearchId` from the redirect URL
    - Update ACCOUNT.md with the clean `savedSearchId=XXXXXXXXXX` URL
-   - Update TOOLS.md with the saved search ID and name
-   
-**Why this matters:** Raw query URLs include a `sessionId` parameter that expires. Saved searches persist indefinitely and return a stable `savedSearchId` URL that works reliably every run.
 
-### Message Template Generation (added 2026-03-26)
-When intake completes, webhook server calls Claude (claude-sonnet-4-5) to generate:
+**Why this matters:** Raw query URLs include a `sessionId` parameter that expires. Saved searches persist indefinitely.
+
+### config-loader.js — Section Name Mapping (IMPORTANT)
+Generated ACCOUNT.md section names vs what config-loader reads:
+
+| config-loader field | ACCOUNT.md section |
+|--------------------|-------------------|
+| `offerDescription` | `## OFFER & VALUE PROP` + `## CTA & MESSAGING` (combined) |
+| `voiceTone` | `## TONE & VOICE` |
+| `followUpGuidance` | `## FOLLOW-UP MESSAGE GUIDANCE` |
+| `inMailGuidance` | `## INMAIL GUIDANCE` |
+| `postEngagementGuidance` | `## POST ENGAGEMENT GUIDANCE` |
+| `icp` | `## TARGET ICP` |
+
+### HISTORY.md Format (IMPORTANT)
+Must include `## Log` header for `logToHistory()` and `hasRunToday()` to work:
+```markdown
+# Activity History — [Name]
+
+| Date | Action |
+|------|--------|
+| YYYY-MM-DD | Profile created — intake complete |
+
+## Log
+```
+Session entries are inserted after `## Log` as `### YYYY-MM-DD` blocks.
+
+### Message Template Generation
+When intake completes, webhook server calls Claude to generate:
 - Connection request (under 300 chars, A/B variants)
 - Follow-up message (under 100 words, A/B variants)
 - InMail subject line + body (under 120 words)
 Templates are voice-matched from intake data and written directly into ACCOUNT.md.
-Requires `dotenv` with `override: true` so it uses `.env` key, not OpenClaw's env.
-
-### What Claude Collects (and enforces)
-- Only 5 areas in scope (listed above)
-- Hard blocks on: daily limits, workflow/process questions, cross-account references
-- Redirect phrase: "That's handled by the team on the backend"
-- Intake JSON includes: name, linkedinUrl, company, email, timezone, city, icp (titles/industries/companySize/geography), salesNavUrl, offer, angle, tone, talkingPoints, avoid, cta, bookingLink, freeOffer, goals, timeline, autoSignature
 
 ### Architecture
 ```
@@ -343,23 +376,9 @@ LaunchAgent:
 - `start-webhook.js` auto-captures new URL, updates `WEBHOOK_URL` in Vercel, redeploys
 - For permanent URL: set up named tunnel via `cloudflared tunnel login` (requires Cloudflare account)
 
-### Env Vars (Vercel)
-- `ANTHROPIC_API_KEY` — active key (updated 2026-03-25)
-- `POSTMARK_API_KEY` — e5451295-0d10-4ef9-a7f6-8f6799d8b798
-- `INTAKE_NOTIFY_EMAIL` — darren@reelaxis.com
-- `WEBHOOK_URL` — cloudflare tunnel URL (auto-updated on Mac Mini restart)
-- `WEBHOOK_SECRET` — matches Mac Mini .env (auto-updated on Mac Mini restart)
-
-### Repo
-https://github.com/reelaxis-lee/larry-onboarding
-
-### Deploy
-```bash
-cd onboarding && vercel --token $VERCEL_TOKEN --yes --prod
-```
-
-### Known Bug (to fix)
-Nickname derivation mismatch: chat step derives from first name ("nicole"), login step derives from email prefix ("nicolepindul"). Folders can end up in different locations. Fix: pass nickname from chat step through to login step via hidden field in UI.
+### Repos
+- Workspace: https://github.com/reelaxis-lee/larry-workspace
+- Onboarding app: https://github.com/reelaxis-lee/larry-onboarding
 
 ---
 
@@ -367,39 +386,39 @@ Nickname derivation mismatch: chat step derives from first name ("nicole"), logi
 
 | Nickname | Full Name | Company | Timezone | Status |
 |----------|-----------|---------|----------|--------|
-| darren | Darren Duffy | ReelAxis | America/Los_Angeles | ✅ Active (Sales Nav exhausted — needs new search) |
-| chris | Chris Lee | getnarrow.ai | America/Los_Angeles | ✅ Active — savedSearchId=1985861058, templates generated |
-| nicolepindul | Nicole DeLutio | OpGen Media | America/New_York | ✅ Ready — savedSearchId=1985871018 |
+| darren | Darren Duffy | ReelAxis | America/Los_Angeles | ✅ Active — check Sales Nav search status |
+| chris | Chris Lee | getnarrow.ai | America/Los_Angeles | ⚠️ Active — Sales Nav search exhausted (0 connections since ~Mar 30) |
+| nicolepindul | Nicole DeLutio | OpGen Media | America/New_York | ✅ Active — savedSearchId=1985871018, 35 connections/day |
 
-### Nicole DeLutio — Profile Notes
-- Onboarded 2026-03-26 via intake chat
-- ICP: VP/Director/CMO level at 500+ employee B2B tech companies (SaaS, Fintech, Healthcare, etc.) — US-wide
-- Offer: Verified MQLs, cost-per-lead model, you only pay for leads you approve
-- Hook: Free ICP assessment before commitment
-- Booking: http://calendly.com/msp-one/opgen-intro
-- A/B testing enabled
-- Browser context: ✅ saved at profiles/nicolepindul/browser-context/
-- Sales Nav URL: ✅ `savedSearchId=1985871018` — "Nicole ICP — B2B Tech VPs Directors US"
+### Chris Sales Nav
+- savedSearchId=1985861058 — exhausted as of ~March 30
+- Needs new saved search from Chris
+
+### Darren Sales Nav  
+- savedSearchId=1973008580 — was exhausted ~March 20, appeared to recover briefly
+- Monitor — may need new search
 
 ---
 
 ## Open Questions / To Do
 
-### Blocking (can't run without these)
-- [x] Nicole: Sales Nav search saved — savedSearchId=1985871018
-- [ ] Darren: set up new Sales Nav saved search (current one exhausted since Mar 20)
-- [ ] Get Bright Data account set up (critical before scaling — currently no proxies)
+### Blocking
+- [ ] Chris: set up new Sales Nav saved search (current exhausted)
+- [ ] Get Bright Data account set up (critical before scaling)
+
+### Bugs to Confirm
+- [ ] Post comments: TipTap fix deployed 2026-03-31 — confirm working in tomorrow's run
+- [ ] InMail duplicate: Chris sent same InMail to Michael Kanaby twice — add "already messaged" dedup guard to inmails.js
 
 ### Onboarding System
 - [ ] Fix nickname derivation mismatch (chat uses first name, login uses email prefix)
 - [ ] Add custom domain: onboard.getnarrow.ai
-- [ ] Set up named Cloudflare tunnel (permanent URL, requires Cloudflare account login)
+- [ ] Set up named Cloudflare tunnel (permanent URL)
 
 ### Automation (existing profiles)
-- [ ] Debug post comments dropout on Darren's profile (stopped ~March 22)
-- [ ] Test follow-up messages (first eligible batch was ~March 20 — still untested)
+- [ ] Test follow-up messages end-to-end (selectors fixed but not yet confirmed working in production)
 - [ ] Inbox response handling (warm lead replies — not built yet)
-- [ ] Review 21+ unread messages in Darren's LinkedIn inbox
+- [ ] Review 21+ unread messages in Chris's LinkedIn inbox
 
 ### Scaling
 - [ ] Confirm from address: larry@getnarrow.ai or reports@getnarrow.ai
