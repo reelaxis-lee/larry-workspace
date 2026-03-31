@@ -14,6 +14,19 @@ const fs = require('fs');
 
 const WORKSPACE = path.resolve(__dirname, '..');
 const PROFILES_DIR = path.join(WORKSPACE, 'profiles');
+const LOCK_FILE = path.join(WORKSPACE, 'logs', 'scheduler.lock');
+
+// Prevent two scheduler instances running simultaneously
+if (fs.existsSync(LOCK_FILE)) {
+  const lockAge = Date.now() - fs.statSync(LOCK_FILE).mtimeMs;
+  if (lockAge < 6 * 60 * 60 * 1000) { // stale after 6 hours
+    console.log(`[scheduler] Already running (lock file exists, ${Math.round(lockAge / 60000)}min old). Exiting.`);
+    process.exit(0);
+  }
+  console.log(`[scheduler] Stale lock file removed (${Math.round(lockAge / 60000)}min old).`);
+  fs.unlinkSync(LOCK_FILE);
+}
+fs.writeFileSync(LOCK_FILE, String(process.pid));
 
 const WINDOW_START_HOUR = 5;   // 5am profile local time
 const WINDOW_END_HOUR   = 23;  // 11pm profile local time
@@ -76,6 +89,14 @@ function runProfile(nickname) {
     });
   });
 }
+
+// Clean up lock on exit (normal or crash)
+function releaseLock() {
+  try { if (fs.existsSync(LOCK_FILE)) fs.unlinkSync(LOCK_FILE); } catch (_) {}
+}
+process.on('exit', releaseLock);
+process.on('SIGINT', () => { releaseLock(); process.exit(0); });
+process.on('SIGTERM', () => { releaseLock(); process.exit(0); });
 
 async function main() {
   console.log(`[scheduler] Daily run triggered at ${new Date().toLocaleString()}`);
