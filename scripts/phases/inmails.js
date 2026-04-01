@@ -12,6 +12,26 @@
 
 const { delays, sleep, randomBetween } = require('../utils/browser');
 const { generateInMail } = require('../utils/messenger');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+/**
+ * Load names already InMailed from HISTORY.md to prevent cross-session duplicates.
+ */
+function loadInMailedNames(nickname) {
+  const historyPath = path.resolve(os.homedir(), `.openclaw/workspace/profiles/${nickname}/HISTORY.md`);
+  if (!fs.existsSync(historyPath)) return new Set();
+  const content = fs.readFileSync(historyPath, 'utf8');
+  const names = new Set();
+  // Match lines like: "InMail → Name" or "InMail sent to Name"
+  const re = /InMail(?:\s+sent\s+to|→)\s+([^\n|]+)/gi;
+  let m;
+  while ((m = re.exec(content)) !== null) {
+    names.add(m[1].trim().toLowerCase());
+  }
+  return names;
+}
 
 async function runInMails(page, config, results) {
   const target = 5;
@@ -20,6 +40,10 @@ async function runInMails(page, config, results) {
   const maxCheck = 20;
   let consecutiveErrors = 0;
   const maxConsecutiveErrors = 5; // bail out if every lead is failing
+
+  // Dedup: track names sent this session + cross-session via HISTORY.md
+  const alreadySent = loadInMailedNames(config.nickname);
+  const sentThisSession = new Set();
 
   console.log(`[${config.nickname}] InMails — target: ${target} open profiles`);
 
@@ -56,6 +80,13 @@ async function runInMails(page, config, results) {
           .textContent({ timeout: 2000 }).catch(() => '')).trim();
 
         if (!name) continue;
+
+        // Skip if already InMailed (this session or a previous session)
+        const nameKey = name.toLowerCase();
+        if (sentThisSession.has(nameKey) || alreadySent.has(nameKey)) {
+          console.log(`[${config.nickname}] ${name} — already InMailed, skipping`);
+          continue;
+        }
 
         // Skip 1st degree (already connected — use follow-up instead)
         const deg = (await lead.locator('.artdeco-entity-lockup__degree').first()
@@ -138,6 +169,7 @@ async function runInMails(page, config, results) {
           await sendBtn.click({ timeout: 8000 });
           sent++;
           consecutiveErrors = 0; // reset on success
+          sentThisSession.add(nameKey);
           results.messagessent = (results.messagessent || 0) + 1;
           console.log(`[${config.nickname}] ✅ InMail sent to ${name} (${sent}/${target}): "${inmail.subject}"`);
           await sleep(randomBetween(1500, 2500));
