@@ -8,6 +8,81 @@ const fs = require('fs');
 const path = require('path');
 
 const SLACK_REPORT_CHANNEL = process.env.SLACK_REPORT_CHANNEL || 'C0ALWJRPQ6R';
+const BUGS_PATH = path.resolve(__dirname, '../../BUGS.md');
+
+/**
+ * Shared: post any message to Slack immediately via OpenClaw gateway.
+ */
+async function postSlackMessage(message) {
+  const http = require('http');
+  const body = JSON.stringify({
+    channel: 'slack',
+    target: SLACK_REPORT_CHANNEL,
+    message,
+  });
+  await new Promise((resolve, reject) => {
+    const req = http.request({
+      hostname: '127.0.0.1',
+      port: parseInt(process.env.OPENCLAW_GATEWAY_PORT || '18789'),
+      path: '/api/message/send',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENCLAW_GATEWAY_TOKEN || 'larry-oc-gateway-2026-secure'}`,
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, res => { res.resume(); res.on('end', resolve); });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+/**
+ * Immediately alert Darren to an error via Slack + log it to BUGS.md.
+ *
+ * @param {object|null} config  - account config (or null if pre-config)
+ * @param {string} phase        - phase name, e.g. "follow-ups"
+ * @param {string} attempted    - what was being attempted
+ * @param {string} errorMsg     - the error message
+ * @param {string} actionTaken  - "skipped and continued" | "phase aborted" | etc.
+ */
+async function alertError(config, phase, attempted, errorMsg, actionTaken) {
+  const nickname = config?.nickname || 'unknown';
+  const slackMsg =
+    `🚨 *LARRY ERROR*\n` +
+    `Profile: ${nickname}\n` +
+    `Phase: ${phase}\n` +
+    `Attempted: ${attempted}\n` +
+    `Error: ${errorMsg}\n` +
+    `Action taken: ${actionTaken}`;
+
+  // Post to Slack immediately (fire and forget — don't let this block the session)
+  postSlackMessage(slackMsg).catch(e => console.error(`[alert] Slack post failed: ${e.message}`));
+
+  // Log to BUGS.md
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const row = `| ${today} | [${nickname}] ${phase}: ${attempted.substring(0, 60)} | Investigating | — |\n`;
+    const bugs = fs.existsSync(BUGS_PATH) ? fs.readFileSync(BUGS_PATH, 'utf8') : '';
+    // Append under "## Active Bugs" table if it exists, else append at end
+    const autoSection = '\n## Auto-logged Session Errors\n\n| Date Found | Description | Status | Resolved Date |\n|------------|-------------|--------|---------------|\n';
+    if (bugs.includes('## Auto-logged Session Errors')) {
+      // Find the end of that table and insert before the next ## or EOF
+      const updated = bugs.replace(
+        /(## Auto-logged Session Errors[\s\S]*?\|[-| ]+\|\n)([\s\S]*?)(\n## |\n*$)/,
+        (_, header, rows, tail) => `${header}${rows}${row}${tail}`
+      );
+      fs.writeFileSync(BUGS_PATH, updated);
+    } else {
+      fs.appendFileSync(BUGS_PATH, autoSection + row);
+    }
+  } catch (e) {
+    console.error(`[alert] BUGS.md write failed: ${e.message}`);
+  }
+
+  console.error(`[${nickname}] ⚠️  ${phase} error: ${errorMsg}`);
+}
 
 /**
  * Post a session summary to the Slack report channel via OpenClaw gateway
@@ -17,6 +92,7 @@ async function postSlackReport(accountConfig, sessionResults) {
     date, connectionsent = 0, messagessent = 0,
     newConnectionsAccepted = 0, positiveReplies = [],
     flags = [], searchStatus = 'Active', sessionStart, sessionEnd,
+    errorCount = 0,
   } = sessionResults;
 
   const flagLines = flags.length > 0
@@ -27,6 +103,10 @@ async function postSlackReport(accountConfig, sessionResults) {
     ? `\n🔥 *Positive replies:* ${positiveReplies.length}`
     : '';
 
+  const errorLine = errorCount > 0
+    ? `\n🚨 *Errors this session: ${errorCount}* — check alerts above`
+    : `\n✅ Errors this session: 0`;
+
   const message =
     `*${accountConfig.name} — Daily LinkedIn Summary (${date})*\n` +
     `🕐 ${sessionStart} → ${sessionEnd}\n` +
@@ -35,37 +115,11 @@ async function postSlackReport(accountConfig, sessionResults) {
     `🤝 New connections accepted: *${newConnectionsAccepted}*` +
     repliesLine +
     `\n🔍 Search: *${searchStatus}*` +
+    errorLine +
     flagLines;
 
   try {
-    // Use OpenClaw gateway REST API to post to Slack
-    const http = require('http');
-    const body = JSON.stringify({
-      channel: 'slack',
-      target: SLACK_REPORT_CHANNEL,
-      message,
-    });
-
-    await new Promise((resolve, reject) => {
-      const req = http.request({
-        hostname: '127.0.0.1',
-        port: parseInt(process.env.OPENCLAW_GATEWAY_PORT || '18789'),
-        path: '/api/message/send',
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.OPENCLAW_GATEWAY_TOKEN || 'larry-oc-gateway-2026-secure'}`,
-          'Content-Length': Buffer.byteLength(body),
-        },
-      }, res => {
-        res.resume();
-        res.on('end', resolve);
-      });
-      req.on('error', reject);
-      req.write(body);
-      req.end();
-    });
-
+    await postSlackMessage(message);
     console.log(`[report] Slack report posted to ${SLACK_REPORT_CHANNEL}`);
   } catch (err) {
     console.error(`[report] Slack post failed: ${err.message}`);
@@ -203,4 +257,4 @@ function logToHistory(accountConfig, sessionResults) {
   console.log(`[report] History logged to ${historyPath}`);
 }
 
-module.exports = { sendSessionReport, logToHistory, postSlackReport };
+module.exports = { sendSessionReport, logToHistory, postSlackReport, alertError };

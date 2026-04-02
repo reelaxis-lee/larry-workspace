@@ -5,6 +5,7 @@
 
 const { delays, sleep, randomBetween } = require('../utils/browser');
 const { generateFollowUp } = require('../utils/messenger');
+const { alertError } = require('../utils/report');
 
 async function runFollowUps(page, config, results) {
   const target = config.dailyMessageTarget || 35;
@@ -124,6 +125,7 @@ async function runFollowUps(page, config, results) {
 
     } catch (err) {
       console.log(`[${config.nickname}] Follow-up error: ${err.message.substring(0, 100)}`);
+      await alertError(config, 'follow-ups', `send follow-up to ${name || 'unknown'}`, err.message.substring(0, 200), 'skipped and continued');
       await page.keyboard.press('Escape').catch(() => {});
       await page.goto('https://www.linkedin.com/mynetwork/invite-connect/connections/', {
         waitUntil: 'domcontentloaded', timeout: 20000

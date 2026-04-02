@@ -14,6 +14,7 @@
 
 const { delays, sleep, randomBetween } = require('../utils/browser');
 const { classifyInboxMessage, generateInboxReply } = require('../utils/messenger');
+const { alertError } = require('../utils/report');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -252,6 +253,7 @@ async function runInboxCheck(page, config, results) {
 
   } catch (err) {
     console.log(`[${config.nickname}] Inbox error: ${err.message.substring(0, 100)}`);
+    await alertError(config, 'inbox', 'reading/responding to inbox', err.message.substring(0, 200), 'phase aborted');
   }
 }
 

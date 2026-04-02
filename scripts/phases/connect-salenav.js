@@ -5,6 +5,7 @@
 
 const { delays, sleep, randomBetween } = require('../utils/browser');
 const { generateConnectionRequest } = require('../utils/messenger');
+const { alertError } = require('../utils/report');
 
 async function runSalesNavConnections(page, config, results) {
   const target = config.dailyConnectionTarget || 35;
@@ -114,6 +115,7 @@ async function runSalesNavConnections(page, config, results) {
 
       } catch (err) {
         console.log(`  Error: ${err.message.substring(0, 100)}`);
+        await alertError(config, 'connections', `send connection request to ${name || 'unknown'}`, err.message.substring(0, 200), 'skipped and continued');
         skipped++;
         await page.keyboard.press('Escape').catch(() => {});
         await sleep(randomBetween(2000, 4000));

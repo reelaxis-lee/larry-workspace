@@ -9,7 +9,7 @@ require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') }
 
 const { loadAccountConfig, hasRunToday } = require('./utils/config-loader');
 const { launchProfile, verifyLinkedInSession, delays, sleep } = require('./utils/browser');
-const { sendSessionReport, logToHistory, postSlackReport } = require('./utils/report');
+const { sendSessionReport, logToHistory, postSlackReport, alertError } = require('./utils/report');
 
 const nickname = process.argv[2];
 
@@ -62,6 +62,7 @@ async function runSession(nickname) {
     connectionsent: 0,
     messagessent: 0,
     newConnectionsAccepted: 0,
+    errorCount: 0,
     positiveReplies: [],
     topReplies: [],
     upcomingFollowUps: 0,
@@ -81,12 +82,30 @@ async function runSession(nickname) {
     console.log(`[${nickname}] LinkedIn session verified ✓`);
 
     // ── Phases 3–7: Run workflow ───────────────────────────────
-    await runInboxCheck(page, config, results);
-    await runFollowUps(page, config, results);
-    await runConnections(page, config, results);
-    await runInMails(page, config, results);
+    // Each phase is wrapped independently — one failure never kills the session.
+    const phases = [
+      { name: 'inbox',       fn: () => runInboxCheck(page, config, results) },
+      { name: 'follow-ups',  fn: () => runFollowUps(page, config, results) },
+      { name: 'connections', fn: () => runConnections(page, config, results) },
+      { name: 'inmails',     fn: () => runInMails(page, config, results) },
+    ];
 
-    console.log(`[${nickname}] All phases complete ✓`);
+    for (const phase of phases) {
+      try {
+        await phase.fn();
+      } catch (phaseErr) {
+        results.errorCount++;
+        await alertError(
+          config,
+          phase.name,
+          `running ${phase.name} phase`,
+          phaseErr.message.substring(0, 200),
+          'phase aborted — continuing to next phase'
+        );
+      }
+    }
+
+    console.log(`[${nickname}] All phases complete ✓ (errors: ${results.errorCount})`);
 
   } catch (err) {
     const errMsg = `Session error: ${err.message}`;

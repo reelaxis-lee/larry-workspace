@@ -12,6 +12,7 @@
 
 const { delays, sleep, randomBetween } = require('../utils/browser');
 const { generateInMail } = require('../utils/messenger');
+const { alertError } = require('../utils/report');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -184,6 +185,7 @@ async function runInMails(page, config, results) {
       } catch (err) {
         consecutiveErrors++;
         console.log(`[${config.nickname}] InMail error (${consecutiveErrors}/${maxConsecutiveErrors}): ${err.message.substring(0, 80)}`);
+        await alertError(config, 'inmails', `send InMail to ${name || 'unknown'}`, err.message.substring(0, 200), consecutiveErrors >= maxConsecutiveErrors ? 'phase aborted' : 'skipped and continued');
         await page.keyboard.press('Escape').catch(() => {});
         await sleep(randomBetween(2000, 3000));
       }
