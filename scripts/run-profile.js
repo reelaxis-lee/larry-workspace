@@ -22,20 +22,7 @@ if (!nickname) {
 const { runSalesNavConnections } = require('./phases/connect-salenav');
 const { runFollowUps }           = require('./phases/follow-ups');
 const { runInMails }             = require('./phases/inmails');
-
-async function runInboxCheck(page, config, results) {
-  // Lightweight: navigate to inbox, log reply count — full response handling is manual for now
-  console.log(`[${config.nickname}] Phase 3: Inbox check (logging only)`);
-  try {
-    await page.goto('https://www.linkedin.com/messaging/', { waitUntil: 'domcontentloaded', timeout: 15000 });
-    await delays.afterPageLoad();
-    const unread = await page.locator('[class*="notification-badge"], .msg-overlay-bubble-header__badge').count().catch(() => 0);
-    console.log(`[${config.nickname}] Unread messages: ${unread}`);
-    if (unread > 0) results.flags.push(`${unread} unread message(s) in inbox — review manually`);
-  } catch (e) {
-    console.log(`[${config.nickname}] Inbox check skipped: ${e.message.substring(0, 60)}`);
-  }
-}
+const { runInboxCheck }          = require('./phases/inbox');
 
 async function runConnections(page, config, results) {
   console.log(`[${config.nickname}] Phase 6: Connection requests (${config.leadSource})`);

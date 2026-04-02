@@ -207,9 +207,100 @@ Write ONLY the comment text. Nothing else.`;
   return response.content[0].text.trim();
 }
 
+/**
+ * Classify an inbox message's intent.
+ * Returns { intent: 'positive'|'neutral'|'negative'|'skip', reason: string }
+ */
+async function classifyInboxMessage(accountConfig, { contactName, messages, lastMessage }) {
+  const convoText = messages.map(m => `${m.sender}: ${m.text}`).join('\n');
+
+  const prompt = `You are analyzing a LinkedIn message thread for ${accountConfig.name} to determine how to respond.
+
+CONVERSATION:
+${convoText}
+
+LATEST MESSAGE FROM ${contactName}:
+"${lastMessage}"
+
+ACCOUNT'S OFFER:
+${accountConfig.offerDescription}
+
+Classify the intent of ${contactName}'s latest message into ONE of these categories:
+- positive: They are clearly interested, want to learn more, asked to schedule a call, said yes, or gave a positive buying signal
+- neutral: They asked a clarifying question, gave a general professional response, or are open but not clearly interested yet
+- negative: They are not interested, asked to be removed, said stop, or expressed frustration
+- skip: The message is completely unrelated (e.g., a generic LinkedIn notification, spam, automated message, or they are clearly talking about something else entirely)
+
+Return ONLY a JSON object like this, nothing else:
+{"intent": "positive", "reason": "They asked to schedule a demo"}`;
+
+  const response = await anthropic.messages.create({
+    model: 'claude-opus-4-5',
+    max_tokens: 80,
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  try {
+    return JSON.parse(response.content[0].text.trim());
+  } catch {
+    return { intent: 'skip', reason: 'parse error' };
+  }
+}
+
+/**
+ * Generate a reply to an inbox message.
+ */
+async function generateInboxReply(accountConfig, { contactName, messages, lastMessage, intent }) {
+  const convoText = messages.map(m => `${m.sender}: ${m.text}`).join('\n');
+
+  const intentGuide = intent === 'positive'
+    ? 'They are interested. Move toward booking a call or next step. Keep it warm and not pushy.'
+    : 'They asked a question or gave a neutral response. Answer naturally and keep the conversation going. Do not pitch hard.';
+
+  const prompt = `You are writing a LinkedIn reply for ${accountConfig.name}.
+
+=== GLOBAL RULES (override everything else) ===
+${GLOBAL_RULES}
+=== END GLOBAL RULES ===
+
+ABOUT ${accountConfig.name.toUpperCase()}:
+${accountConfig.offerDescription}
+
+VOICE & TONE:
+${accountConfig.voiceTone}
+
+CONVERSATION SO FAR:
+${convoText}
+
+LATEST MESSAGE FROM ${contactName}:
+"${lastMessage}"
+
+INTENT: ${intentGuide}
+
+RULES:
+- 2–4 sentences max
+- Sound like a real person continuing a real conversation
+- Address what they actually said
+- ${intent === 'positive' ? 'Suggest a next step (call, demo, or send them a link if config allows)' : 'Keep it conversational — no hard sell'}
+- No bullet points
+- ${accountConfig.hasAutoSignature ? 'No sign-off — auto-signature is appended' : 'End naturally'}
+
+Write ONLY the reply text. Nothing else.`;
+
+  const response = await anthropic.messages.create({
+    model: 'claude-opus-4-5',
+    max_tokens: 200,
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  return response.content[0].text.trim();
+}
+
 module.exports = {
   generateConnectionRequest,
   generateFollowUp,
   generateInMail,
   generatePostComment,
+  classifyInboxMessage,
+  generateInboxReply,
 };
