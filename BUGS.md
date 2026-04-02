@@ -9,8 +9,9 @@ Updated after every session or fix. Use this file for any active bug, open quest
 | Date Found | Description | Status | Resolved Date |
 |------------|-------------|--------|---------------|
 | 2026-03-29 | Post comments — TipTap fix deployed but comments still showing 0. page.keyboard.type() + page-level submit button scope applied. Unconfirmed in production. | Open | — |
-| 2026-04-02 | Inbox phase — send button not enabling after typing reply into .msg-form__contenteditable. Ember.js change detection may not fire from keyboard events alone. | Open | — |
-| 2026-04-02 | Inbox phase — browser context closes unexpectedly after failed reply attempt, causing page.goto error on next iteration. | Open | — |
+| 2026-04-02 | [inbox] Send button not enabling after typing reply into .msg-form__contenteditable. Ember.js change detection may not fire from keyboard events alone. Fix deployed but not confirmed. | Unverified — not confirmed fixed | — |
+| 2026-04-02 | [inbox] Browser context closes unexpectedly after failed reply attempt, causing page.goto error on next thread. Fix deployed but not confirmed. | Unverified — not confirmed fixed | — |
+| 2026-04-02 | [inbox] Thread reading reliability — scroll to latest message may not load all messages before reading. Fix deployed but not confirmed. | Unverified — not confirmed fixed | — |
 
 ---
 

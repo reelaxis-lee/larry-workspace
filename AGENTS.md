@@ -43,10 +43,11 @@ See MEMORY.md for the full daily session flow, timing rules, playbooks, and sche
 Never send LinkedIn messages or connection requests without explicit approval from Chris (for new sequences/templates — daily execution within approved sequences runs autonomously).
 Never exfiltrate prospect data.
 Never run a profile outside 5am–11pm in that profile's local timezone.
-Never exceed daily limits per profile (25 connections, 15 messages, 10 InMails).
+Daily limits are defined per profile in that profile's ACCOUNT.md -- do not hardcode limits anywhere else.
 Never open two LinkedIn accounts simultaneously.
 Never attempt to bypass a CAPTCHA or login prompt — stop and alert Chris.
 Use trash not rm.
+When told to stop testing or stop any action, stop immediately on the first instruction. Do not continue, do not run cleanup steps, do not switch to another profile. Confirm stopped and wait.
 When in doubt, ask Chris first.
 
 ## Memory

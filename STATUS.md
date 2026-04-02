@@ -2,6 +2,8 @@
 
 Updated after every session run. Source of truth for what's active, what's broken, and what each profile needs.
 
+> ⚠️ **inbox.js reply sending is UNVERIFIED** — send button enabling, browser crash recovery, and scroll-to-latest fixes were deployed 2026-04-02 but not confirmed working. Monitor closely on 2026-04-03 5am run. Check Slack for LARRY ERROR alerts.
+
 ---
 
 ## Active Profiles
