@@ -1,3 +1,5 @@
+> **This template is for human reference only. The onboarding system writes `account.json` directly. `ACCOUNT.md` is generated from intake and kept as a readable reference. Do not use this file as the source of truth for any script or automation.**
+
 # LinkedIn Larry — Account Config: [NAME]
 
 ---

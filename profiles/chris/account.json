@@ -1,0 +1,39 @@
+{
+  "nickname": "chris",
+  "fullName": "Chris Lee",
+  "company": "getnarrow.ai",
+  "timezone": "America/Los_Angeles",
+  "salesNavUrl": "https://www.linkedin.com/sales/search/people?savedSearchId=1985861058",
+  "proxy": "see .env",
+  "autoSignature": false,
+  "dailyLimits": {
+    "connections": 40,
+    "messages": 40,
+    "inmails": 5
+  },
+  "icp": "Job titles: Owners, Founders, C-Level. Industries: B2B Services Companies. Company size: 2–50 employees. Geography: United States.",
+  "offerDescription": "AI Sales Agent that replaces a junior sales rep -- handles inbound and outbound, knows your product inside and out from day one, ~$3K/month vs $60K-$100K/year for a human rep.\n\nUnique angle: Not just an SDR tool -- it's a full sales agent that understands your product (pricing, integrations, specs) with no ramp time. Execution capacity that compounds monthly at 1/20th the cost. Built by operators (Chris Lee, Nick Dinsmoor, Paul Fung) who scaled and exited their own B2B services company.\n\nTalking points: Replaces junior sales rep from day one. Handles inbound and outbound. Knows product inside and out with no ramp time. ~$3K/month vs $60K-$100K/year. Execution capacity that compounds monthly. Built by operators who scaled and exited a B2B services company.\n\nPrimary CTA: Can I send you a demo?\n\nAvoid: Sounding over-personalized.",
+  "voiceTone": "Casual, conversational, short, pain-point focused.",
+  "followUpGuidance": "Sent 3 days after connecting. Short, casual, pain-first. One ask at the end.\n\nWhat NOT to do: Don't over-explain. Don't list every feature. Don't sound over-personalized.",
+  "inMailGuidance": "Open Profiles only (free). Subject under 8 words. Include natural sign-off.",
+  "messageTemplates": {
+    "connectionRequest": {
+      "a": "[First Name] -- built an AI agent that handles sales calls like a junior rep for $3K/month. Thought it might be relevant for [Company Name].",
+      "b": "[First Name] -- we replaced junior sales reps with AI agents that know your product inside-out. $3K/month vs $60K-$100K/year. Worth a look?"
+    },
+    "followUp": {
+      "a": "Hey [First Name],\n\nQuick question -- are you hiring sales reps right now or thinking about it?\n\nWe built an AI sales agent that replaces a junior rep from day one. Handles inbound and outbound, knows your pricing/integrations/specs without any training, and costs ~$3K/month instead of $60K-$100K/year.\n\nThe difference: this isn't an SDR tool. It's a full sales agent with execution capacity that compounds monthly.\n\nBuilt it with my co-founders after scaling and exiting our own B2B services company.\n\nCan I send you a demo?\n\n-- Chris",
+      "b": "Hey [First Name],\n\nYou know that 3-6 month ramp time for new sales reps? And the $60K-$100K salary before they're even productive?\n\nWe killed both problems.\n\nBuilt an AI sales agent that handles inbound and outbound, knows your product inside and out from day one, and costs ~$3K/month.\n\nNot a chatbot or SDR tool -- it's a full sales agent with execution capacity that compounds monthly.\n\nCan I send you a demo?\n\n-- Chris"
+    },
+    "inMail": {
+      "subject": "Replace junior reps with AI agents?",
+      "body": "Hey [First Name],\n\nMost AI sales tools just book meetings. We built an actual sales agent.\n\nHandles inbound and outbound calls, knows your product inside-out from day one (pricing, specs, integrations), and costs ~$3K/month vs $60K-$100K for a junior rep.\n\nNo ramp time. No training. Just execution capacity that compounds monthly.\n\nMy co-founders and I scaled and exited our own B2B services company -- we built this because we needed it.\n\nCan I send you a demo?\n\n-- Chris"
+    }
+  },
+  "webhookEndpoints": {},
+  "dashboardMeta": {
+    "createdAt": "2026-03-26",
+    "lastModified": "2026-04-02",
+    "modifiedBy": "larry"
+  }
+}

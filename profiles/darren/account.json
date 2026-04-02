@@ -1,0 +1,39 @@
+{
+  "nickname": "darren",
+  "fullName": "Darren Duffy",
+  "company": "ReelAxis",
+  "timezone": "America/Los_Angeles",
+  "salesNavUrl": "https://www.linkedin.com/sales/search/people?savedSearchId=1973008580",
+  "proxy": "see .env",
+  "autoSignature": true,
+  "dailyLimits": {
+    "connections": 40,
+    "messages": 40,
+    "inmails": 5
+  },
+  "icp": "Job titles: CEO, Owner, Founder, Co-Founder, President, Marketing Director, Marketing Manager. Industries: Small businesses across all industries. Company size: 1–50 employees (SMB). Geography: San Diego, CA. Targeting notes: Local angle is key. Darren is also San Diego-based. Use this to build rapport naturally.",
+  "offerDescription": "Reel Axis is a marketing and demand generation agency. This outreach leads with a specific web offer: clean, professional websites for small businesses. Zero-risk entry point: Reel Axis builds a free homepage mockup. If they like it, move forward. If not, no obligation.\n\nDo NOT describe Reel Axis as a 'web design agency.' If the agency comes up, it's a 'marketing and demand generation agency.'\n\nPrimary CTA: Get a reply showing interest. No booking link. Goal is to open a conversation.\n\nOffer framing: The free mockup is the hook. Don't oversell the website. 'No obligation / if you don't like it, no worries' angle is powerful. Darren is local. Neighbor-to-neighbor, not national agency cold calling.",
+  "voiceTone": "Conversational and direct. Everyday language, short sentences, no jargon. Avoid: humor, exclamation points, corporate speak, filler phrases, em dashes. Sound like a straightforward local business owner talking to another local business owner.\n\nFormatting rules: Use double hyphens (--) instead of em dashes. Max 300 characters for connection requests (target 240–285). No links in first cold outreach. Max 1 exclamation point per message (prefer zero).",
+  "followUpGuidance": "Short and local. Acknowledge connection, one plain sentence on what Darren does, drop the free mockup offer with no-pressure close. No link. No hard ask. 3–4 sentences max.\n\nOffer: Free homepage mockup. If you like it, we build it out. If not, no worries.\n\nWhat NOT to say: 'I'd love to hop on a quick call', 'synergy', 'leverage', any agency-speak. Don't write a paragraph. No links in first follow-up.\n\nExample structure (rewrite every time -- never copy):\nHey [First Name], good to connect. Fellow San Diegan here.\n\nI run Reel Axis. We build clean, simple websites for local businesses. No fluff, just something that looks professional and gets your info across clearly.\n\nWe put together free homepage mockups for businesses we think we could help. If you like it, great. If not, no pressure at all. Worth a look?",
+  "inMailGuidance": "Subject line: Reference San Diego or their business type. Under 7 words. Feels specific to them.\n\nBody: Under 120 words. Local angle. Plain offer. Simple yes/no close.\n\nDo NOT type a sign-off. 'Cheers, Darren' is appended automatically.",
+  "messageTemplates": {
+    "connectionRequest": {
+      "a": "Hey [First Name] -- fellow San Diegan here. I help local businesses get a clean, professional website. Happy to put together a free homepage mockup for you -- no strings attached. Worth a look?",
+      "b": "Hey [First Name] -- saw you're based in San Diego. I run Reel Axis, we build websites for local businesses. Happy to do a free mockup for you if it's helpful. No obligation."
+    },
+    "followUp": {
+      "a": "Hey [First Name], good to connect. Fellow San Diegan here.\n\nI run Reel Axis. We build clean, simple websites for local businesses. No fluff, just something that looks professional and gets your info across clearly.\n\nWe put together free homepage mockups for businesses we think we could help. If you like it, great. If not, no pressure at all. Worth a look?",
+      "b": "Hey [First Name], great to be connected.\n\nQuick note -- I run a small marketing agency called Reel Axis, based in San Diego. We specialize in clean, simple websites for local businesses.\n\nWe're offering free homepage mockups right now. You take a look, and if it resonates, we can talk about building it out. If not, totally fine."
+    },
+    "inMail": {
+      "subject": "Free website mockup for San Diego businesses",
+      "body": "Hey [First Name],\n\nCame across your profile -- I'm also based in San Diego and run a company called Reel Axis.\n\nWe build websites for local businesses that are clean, simple, and professional. No overcomplicated designs, just something that works and looks good.\n\nWe're offering free homepage mockups for San Diego businesses right now. You take a look, and if you like it, we can talk about building it out. If not, totally fine.\n\nInterested in taking a look?"
+    }
+  },
+  "webhookEndpoints": {},
+  "dashboardMeta": {
+    "createdAt": "2026-03-13",
+    "lastModified": "2026-04-02",
+    "modifiedBy": "larry"
+  }
+}
