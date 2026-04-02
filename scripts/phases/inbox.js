@@ -62,14 +62,16 @@ async function runInboxCheck(page, config, results) {
     const threads = [];
     for (let i = 0; i < Math.min(itemCount, MAX_THREADS + 2); i++) {
       const item = items.nth(i);
-      const text = (await item.innerText().catch(() => '')).trim();
-      if (!text || text.length < 5) continue;
+      // Extract name from dedicated name element (avoids picking up "Status is online" etc.)
+      const nameEl = item.locator('.msg-conversation-card__participant-names, .msg-conversation-listitem__participant-names').first();
+      const name = (await nameEl.textContent().catch(() => '')).trim() ||
+                   (await item.innerText().catch(() => '')).split('\n').find(l => l.trim().length > 2 && !l.includes('Status is')) || '';
+      if (!name || name.length < 2) continue;
 
-      // Extract name (first line of innerText before newline)
-      const firstLine = text.split('\n')[0].trim();
       const hasUnread = await item.locator('.notification-badge--show').count().catch(() => 0) > 0;
+      const preview = (await item.innerText().catch(() => '')).trim().substring(0, 120);
 
-      threads.push({ index: i, name: firstLine, hasUnread, text: text.substring(0, 120) });
+      threads.push({ index: i, name, hasUnread, text: preview });
     }
 
     // Prioritize: unread first, then recent
