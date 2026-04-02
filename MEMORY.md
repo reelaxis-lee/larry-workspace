@@ -86,7 +86,9 @@ scripts/
     config-loader.js        ← parse ACCOUNT.md → JS config object
     browser.js              ← Playwright helpers, delays, session verify
     messenger.js            ← all Claude API calls (loads GLOBAL.md on startup)
-    report.js               ← HISTORY.md log + Slack post + Postmark email
+    report.js               ← HISTORY.md log + Slack post + Postmark email; exports alertError(), postSlackMessage()
+    status.js               ← STATUS.md read/write helpers (search exhausted flags)
+    startup-check.js        ← pre-scheduler health check; critical file verify, profile status, bug count, Slack summary
   webhook-server.js         ← Express port 3743: intake + login endpoints
   linkedin-login.js         ← Playwright automated login with 2FA back-channel
   start-webhook.js          ← starts webhook + Cloudflare tunnel + updates Vercel env

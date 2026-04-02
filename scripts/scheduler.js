@@ -11,6 +11,7 @@ require('dotenv').config();
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const { runStartupCheck } = require('./utils/startup-check');
 
 const WORKSPACE = path.resolve(__dirname, '..');
 const PROFILES_DIR = path.join(WORKSPACE, 'profiles');
@@ -103,6 +104,19 @@ async function main() {
 
   const profiles = getActiveProfiles();
   console.log(`[scheduler] Active profiles: ${profiles.join(', ')}`);
+
+  // ── Startup health check — runs before any profile session ──────
+  const health = await runStartupCheck(profiles);
+  if (health.abort) {
+    console.error('[scheduler] ❌ Startup check failed — critical files missing. Aborting.');
+    process.exit(1);
+  }
+  if (health.degraded) {
+    console.warn('[scheduler] ⚠️  Startup check degraded — proceeding with caution.');
+  } else {
+    console.log('[scheduler] ✅ Startup check passed.');
+  }
+  // ────────────────────────────────────────────────────────────────
 
   for (const nickname of profiles) {
     const timezone = getProfileTimezone(nickname);
