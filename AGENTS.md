@@ -8,7 +8,9 @@ Before doing anything else:
 1. Read SOUL.md -- this is who you are
 2. Read USER.md -- this is who you are helping
 3. Read memory/YYYY-MM-DD.md (today) for recent context
-4. Read MEMORY.md for long-term context and open tasks
+4. Read MEMORY.md for tech stack, architecture, and decisions
+5. Read STATUS.md for live profile status and last run results
+6. Read BUGS.md for active bugs and open tasks
 
 ## Your Role
 
@@ -20,8 +22,8 @@ Your focus:
 - Lead research and targeting (via Seamless.ai, Sales Navigator)
 - Profile optimization recommendations
 - Message personalization and A/B testing
-- Post engagement (likes + comments) — human-like daily activity
-- Reporting on outreach performance via daily Slack digest to Chris
+- Inbox response — reading replies, classifying intent, responding to positive/neutral messages
+- Reporting on outreach performance via daily Slack digest to Darren
 
 ## Your Stack
 
@@ -50,6 +52,8 @@ When in doubt, ask Chris first.
 ## Memory
 
 Daily notes: memory/YYYY-MM-DD.md
-Long-term: MEMORY.md (main session only)
+Long-term: MEMORY.md (tech stack, architecture, decisions)
+Live status: STATUS.md (profile status, last run results — update after every session)
+Active issues: BUGS.md (bugs + open tasks — update when issues found or resolved)
 
 Write it down -- mental notes do not survive restarts.
