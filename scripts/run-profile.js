@@ -23,9 +23,21 @@ const { runSalesNavConnections } = require('./phases/connect-salenav');
 const { runFollowUps }           = require('./phases/follow-ups');
 const { runInMails }             = require('./phases/inmails');
 const { runInboxCheck }          = require('./phases/inbox');
+const { isSearchExhausted }      = require('./utils/status');
 
 async function runConnections(page, config, results) {
   console.log(`[${config.nickname}] Phase 6: Connection requests (${config.leadSource})`);
+
+  // Skip if search was previously flagged exhausted AND the URL hasn't changed
+  if (config.leadSource === 'sales-navigator' && isSearchExhausted(config.nickname, config.salesNavSearchUrl)) {
+    const msg = 'Connection phase skipped — search exhausted, new URL needed';
+    console.log(`[${config.nickname}] ${msg}`);
+    results.flags = results.flags || [];
+    results.flags.push(msg);
+    results.searchStatus = 'Exhausted';
+    return;
+  }
+
   if (config.leadSource === 'sales-navigator') {
     await runSalesNavConnections(page, config, results);
   } else {

@@ -6,11 +6,15 @@
 const { delays, sleep, randomBetween } = require('../utils/browser');
 const { generateConnectionRequest } = require('../utils/messenger');
 const { alertError } = require('../utils/report');
+const { setSearchExhausted } = require('../utils/status');
+
+const EMPTY_PAGE_LIMIT = 10; // pages with zero eligible leads before declaring exhausted
 
 async function runSalesNavConnections(page, config, results) {
   const target = config.dailyConnectionTarget || 35;
   let sent = 0;
   let skipped = 0;
+  let consecutiveEmptyPages = 0; // pages where no leads passed the eligibility filter
 
   console.log(`[${config.nickname}] Sales Nav connections — target: ${target}`);
 
@@ -30,12 +34,15 @@ async function runSalesNavConnections(page, config, results) {
     const leads = await page.locator('[data-x-search-result="LEAD"]').all();
 
     if (leads.length === 0) {
-      console.log(`[${config.nickname}] No leads on page ${pageNum} — search exhausted`);
+      consecutiveEmptyPages++;
+      console.log(`[${config.nickname}] No leads on page ${pageNum} — search exhausted (${consecutiveEmptyPages}/${EMPTY_PAGE_LIMIT} empty pages)`);
       results.searchStatus = 'Exhausted';
+      await flagSearchExhausted(config, results);
       break;
     }
 
     console.log(`[${config.nickname}] Page ${pageNum}: ${leads.length} leads`);
+    let eligibleThisPage = 0;
 
     for (let i = 0; i < leads.length; i++) {
       if (sent >= target) break;
@@ -90,6 +97,9 @@ async function runSalesNavConnections(page, config, results) {
           continue;
         }
 
+        // This lead passed all filters — eligible
+        eligibleThisPage++;
+
         // Generate personalized message
         const leadProfile = { name, title, company, location, tenure, about, mutualConnections, degree };
         console.log(`  Generating message...`);
@@ -122,6 +132,20 @@ async function runSalesNavConnections(page, config, results) {
       }
     }
 
+    // After processing this page: check if it was empty (no eligible leads)
+    if (eligibleThisPage === 0) {
+      consecutiveEmptyPages++;
+      console.log(`[${config.nickname}] Page ${pageNum}: 0 eligible leads (${consecutiveEmptyPages}/${EMPTY_PAGE_LIMIT} consecutive empty pages)`);
+      if (consecutiveEmptyPages >= EMPTY_PAGE_LIMIT) {
+        console.log(`[${config.nickname}] Search exhausted — ${EMPTY_PAGE_LIMIT} pages with no eligible leads`);
+        results.searchStatus = 'Exhausted';
+        await flagSearchExhausted(config, results);
+        break;
+      }
+    } else {
+      consecutiveEmptyPages = 0; // reset on any page that had eligible leads
+    }
+
     // Next page
     if (sent < target) {
       await dismissModals(page);
@@ -138,6 +162,7 @@ async function runSalesNavConnections(page, config, results) {
       } else {
         console.log(`[${config.nickname}] No next page — done`);
         results.searchStatus = 'Exhausted';
+        await flagSearchExhausted(config, results);
         break;
       }
     }
@@ -391,6 +416,29 @@ async function dismissModals(page) {
       await sleep(300);
     }
   } catch (_) {}
+}
+
+/**
+ * Post a search-exhausted alert to Slack and update STATUS.md.
+ */
+async function flagSearchExhausted(config, results) {
+  const { postSlackMessage } = require('../utils/report');
+  const { setSearchExhausted } = require('../utils/status');
+
+  const searchId = (config.salesNavSearchUrl || '').match(/savedSearchId=(\d+)/)?.[1] || config.salesNavSearchUrl || 'unknown';
+
+  const msg =
+    `🚩 *LARRY FLAG -- SEARCH EXHAUSTED*\n` +
+    `Profile: ${config.nickname}\n` +
+    `Search ID: ${searchId}\n` +
+    `Result: 0 eligible leads found after ${EMPTY_PAGE_LIMIT} pages\n` +
+    `Action: Connection phase ending early -- new search URL needed`;
+
+  postSlackMessage(msg).catch(e => console.error(`[alert] Slack post failed: ${e.message}`));
+  setSearchExhausted(config.nickname, config.salesNavSearchUrl || '');
+  results.flags = results.flags || [];
+  results.flags.push(`Search exhausted — new Sales Nav URL needed for ${config.nickname}`);
+  console.log(`[${config.nickname}] 🚩 Search exhausted flag set in STATUS.md`);
 }
 
 module.exports = { runSalesNavConnections };

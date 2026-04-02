@@ -257,4 +257,4 @@ function logToHistory(accountConfig, sessionResults) {
   console.log(`[report] History logged to ${historyPath}`);
 }
 
-module.exports = { sendSessionReport, logToHistory, postSlackReport, alertError };
+module.exports = { sendSessionReport, logToHistory, postSlackReport, alertError, postSlackMessage };
