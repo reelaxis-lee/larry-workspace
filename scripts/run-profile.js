@@ -21,7 +21,6 @@ if (!nickname) {
 // ─── Phase runners ────────────────────────────────────────────────
 const { runSalesNavConnections } = require('./phases/connect-salenav');
 const { runFollowUps }           = require('./phases/follow-ups');
-const { runPostEngagement }      = require('./phases/post-engagement');
 const { runInMails }             = require('./phases/inmails');
 
 async function runInboxCheck(page, config, results) {
@@ -75,8 +74,6 @@ async function runSession(nickname) {
     sessionEnd: null,
     connectionsent: 0,
     messagessent: 0,
-    postLikes: 0,
-    postComments: 0,
     newConnectionsAccepted: 0,
     positiveReplies: [],
     topReplies: [],
@@ -99,7 +96,6 @@ async function runSession(nickname) {
     // ── Phases 3–7: Run workflow ───────────────────────────────
     await runInboxCheck(page, config, results);
     await runFollowUps(page, config, results);
-    await runPostEngagement(page, config, results);
     await runConnections(page, config, results);
     await runInMails(page, config, results);
 

@@ -14,8 +14,8 @@ const SLACK_REPORT_CHANNEL = process.env.SLACK_REPORT_CHANNEL || 'C0ALWJRPQ6R';
  */
 async function postSlackReport(accountConfig, sessionResults) {
   const {
-    date, connectionsent = 0, messagessent = 0, postLikes = 0,
-    postComments = 0, newConnectionsAccepted = 0, positiveReplies = [],
+    date, connectionsent = 0, messagessent = 0,
+    newConnectionsAccepted = 0, positiveReplies = [],
     flags = [], searchStatus = 'Active', sessionStart, sessionEnd,
   } = sessionResults;
 
@@ -32,7 +32,6 @@ async function postSlackReport(accountConfig, sessionResults) {
     `🕐 ${sessionStart} → ${sessionEnd}\n` +
     `📤 Connections sent: *${connectionsent}*\n` +
     `💬 Messages sent: *${messagessent}*\n` +
-    `👍 Likes: *${postLikes}*  |  🗣️ Comments: *${postComments}*\n` +
     `🤝 New connections accepted: *${newConnectionsAccepted}*` +
     repliesLine +
     `\n🔍 Search: *${searchStatus}*` +
@@ -86,8 +85,6 @@ async function sendSessionReport(accountConfig, sessionResults) {
     date,
     connectionsent = 0,
     messagessent = 0,
-    postLikes = 0,
-    postComments = 0,
     newConnectionsAccepted = 0,
     positiveReplies = [],
     upcomingFollowUps = 0,
@@ -112,8 +109,6 @@ Here's your LinkedIn activity summary for ${date}:
 
 📤 Connection requests sent: ${connectionsent}
 💬 Messages sent: ${messagessent}
-👍 Posts liked: ${postLikes}
-🗣️ Posts commented on: ${postComments}
 🤝 New connections accepted: ${newConnectionsAccepted}
 🔥 Positive replies: ${positiveReplies.length}
 ${repliesSection}
@@ -133,8 +128,6 @@ Powered by Larry at getnarrow.ai
   <table style="width:100%; border-collapse:collapse; margin: 16px 0;">
     <tr style="background:#f3f4f6;"><td style="padding:8px 12px;">📤 Connection requests sent</td><td style="padding:8px 12px; font-weight:bold;">${connectionsent}</td></tr>
     <tr><td style="padding:8px 12px;">💬 Messages sent</td><td style="padding:8px 12px; font-weight:bold;">${messagessent}</td></tr>
-    <tr style="background:#f3f4f6;"><td style="padding:8px 12px;">👍 Posts liked</td><td style="padding:8px 12px; font-weight:bold;">${postLikes}</td></tr>
-    <tr><td style="padding:8px 12px;">🗣️ Posts commented on</td><td style="padding:8px 12px; font-weight:bold;">${postComments}</td></tr>
     <tr style="background:#f3f4f6;"><td style="padding:8px 12px;">🤝 New connections accepted</td><td style="padding:8px 12px; font-weight:bold;">${newConnectionsAccepted}</td></tr>
     <tr><td style="padding:8px 12px;">🔥 Positive replies</td><td style="padding:8px 12px; font-weight:bold;">${positiveReplies.length}</td></tr>
     <tr style="background:#f3f4f6;"><td style="padding:8px 12px;">📅 Follow-ups due tomorrow</td><td style="padding:8px 12px; font-weight:bold;">${upcomingFollowUps}</td></tr>
@@ -185,8 +178,6 @@ function logToHistory(accountConfig, sessionResults) {
     date,
     connectionsent = 0,
     messagessent = 0,
-    postLikes = 0,
-    postComments = 0,
     newConnectionsAccepted = 0,
     positiveReplies = [],
     flags = [],
@@ -197,12 +188,9 @@ function logToHistory(accountConfig, sessionResults) {
 
   const entry = `
 ### ${date}
-- Session start: ${sessionStart}
-- Session end: ${sessionEnd}
-- Post likes: ${postLikes}
-- Post comments: ${postComments}
-- Follow-up messages: ${messagessent} 
-- Connection requests: ${connectionsent}
+- Session: ${sessionStart} → ${sessionEnd}
+- Connection requests sent: ${connectionsent}
+- Follow-up messages sent: ${messagessent}
 - New connections accepted: ${newConnectionsAccepted}
 - Positive responses: ${positiveReplies.length}
 - Flags/issues: ${flags.length > 0 ? flags.join('; ') : 'none'}
