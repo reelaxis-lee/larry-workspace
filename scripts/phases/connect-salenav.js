@@ -48,13 +48,14 @@ async function runSalesNavConnections(page, config, results) {
       if (sent >= target) break;
 
       const lead = leads[i];
+      let name = ''; // declared outside try so catch block can reference it
 
       try {
         // Clear any modal overlays before reading/clicking this lead
         await dismissModals(page);
 
         // Read profile data from card
-        const name     = (await lead.locator('[data-anonymize="person-name"]').first().textContent({ timeout: 3000 }).catch(() => '')).trim();
+        name                = (await lead.locator('[data-anonymize="person-name"]').first().textContent({ timeout: 3000 }).catch(() => '')).trim();
         const title    = (await lead.locator('[data-anonymize="title"]').first().textContent({ timeout: 3000 }).catch(() => '')).trim();
         const company  = (await lead.locator('[data-anonymize="company-name"]').first().textContent({ timeout: 3000 }).catch(() => '')).trim();
         const location = (await lead.locator('[data-anonymize="location"]').first().textContent({ timeout: 3000 }).catch(() => '')).trim();
