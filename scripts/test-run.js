@@ -222,36 +222,42 @@ async function phase2SalesNavInbox(page, config) {
     await sleep(randomBetween(4000, 6000));
     setProgress(2, 'Reading Sales Nav inbox threads…');
 
-    // Sales Nav inbox conversation list
-    const threads = await page.locator('[data-view-name="sales-inbox-conversation-list-item"], .conversations-list__conversation').all();
-    if (!threads.length) return skipped('No Sales Nav inbox threads found');
+    // Verified selector: .conversation-list-item (20 found in live DOM probe 2026-04-06)
+    const threadCount = await page.locator('.conversation-list-item').count().catch(() => 0);
+    if (!threadCount) return skipped('No Sales Nav inbox threads found');
 
     const alreadyReplied = loadRepliedNames(config.nickname);
 
-    for (let i = 0; i < Math.min(threads.length, 10); i++) {
+    for (let i = 0; i < Math.min(threadCount, 10); i++) {
       try {
-        const thread = threads[i];
+        const thread = page.locator('.conversation-list-item').nth(i);
+
+        // Get contact name from the thread list item before clicking
+        const nameEl = thread.locator('span[data-anonymize="person-name"]').first();
+        const name = (await nameEl.textContent({ timeout: 2000 }).catch(() => '')).trim();
+        if (!name || alreadyReplied.has(name.toLowerCase())) continue;
+
         await thread.click();
         await sleep(randomBetween(2000, 3000));
 
-        // Get contact name from the open thread header
-        const nameEl = page.locator('.conversation-header__name, [data-view-name="conversation-header"] .t-bold, .msg-entity-lockup__entity-title').first();
-        const name = (await nameEl.textContent({ timeout: 3000 }).catch(() => '')).trim();
-        if (!name || alreadyReplied.has(name.toLowerCase())) continue;
+        // Read messages — each is an <article> in .thread-container
+        // Incoming messages have span[data-anonymize="person-name"]; outgoing do not
+        const articles = await page.locator('.thread-container article').all();
+        if (!articles.length) continue;
 
-        // Read last 8 messages
-        const msgEls = await page.locator('.artdeco-message-body, .msg-s-message-list__event').all();
-        const lastMsgs = msgEls.slice(-8);
         const conversation = [];
-        for (const el of lastMsgs) {
-          const text = (await el.textContent({ timeout: 1000 }).catch(() => '')).trim();
-          const isMine = await el.locator('.msg-s-message-group--outgoing, [class*="outgoing"]').count().then(c => c > 0).catch(() => false);
+        for (const article of articles) {
+          // Check if incoming (has named sender span) or outgoing
+          const senderEl = article.locator('span[data-anonymize="person-name"]').first();
+          const isMine = !(await senderEl.isVisible({ timeout: 500 }).catch(() => false));
+          const textEl = article.locator('p[data-anonymize="general-blurb"]').first();
+          const text = (await textEl.textContent({ timeout: 1000 }).catch(() => '')).trim();
           if (text) conversation.push({ sender: isMine ? 'me' : 'them', text });
         }
 
         if (!conversation.length) continue;
         const last = conversation[conversation.length - 1];
-        if (last.sender !== 'them') continue;
+        if (last.sender !== 'them') continue;  // Skip if Darren sent the last message
 
         const messages = conversation.map(m => ({ sender: m.sender === 'me' ? 'Me' : name, text: m.text }));
         const classification = await classifyInboxMessage(config, { contactName: name, messages, lastMessage: last.text });
@@ -259,20 +265,24 @@ async function phase2SalesNavInbox(page, config) {
 
         const reply = await generateInboxReply(config, { contactName: name, messages, lastMessage: last.text, intent: classification.intent });
 
-        // Sales Nav reply editor
-        const editor = page.locator('.msg-form__contenteditable[contenteditable="true"], [data-view-name="conversation-reply-editor"] [contenteditable]').first();
-        if (!await editor.isVisible({ timeout: 3000 }).catch(() => false)) continue;
-        await editor.click();
+        // Verified compose selector: textarea[placeholder="Type your message here…"]
+        // Send button: button[data-sales-action] (disabled until text typed)
+        const textarea = page.locator('textarea[placeholder="Type your message here…"]').first();
+        if (!await textarea.isVisible({ timeout: 4000 }).catch(() => false)) continue;
+        await textarea.click();
         await sleep(500);
-        await page.keyboard.type(reply, { delay: randomBetween(30, 60) });
+        await textarea.type(reply, { delay: randomBetween(30, 60) });
         await sleep(randomBetween(800, 1500));
 
-        const sendBtn = page.locator('button.msg-form__send-button, button:has-text("Send")').first();
-        if (await sendBtn.isEnabled({ timeout: 3000 }).catch(() => false)) {
-          await sendBtn.click();
-        } else {
-          await page.keyboard.press('Enter');
+        // Wait for send button to enable
+        const sendBtn = page.locator('button[data-sales-action]').first();
+        let sendReady = false;
+        for (let attempt = 0; attempt < 8; attempt++) {
+          if (await sendBtn.isEnabled({ timeout: 500 }).catch(() => false)) { sendReady = true; break; }
+          await sleep(500);
         }
+        if (!sendReady) continue;
+        await sendBtn.click();
         await sleep(randomBetween(1500, 2500));
 
         appendToHistory(config.nickname, `- Inbox reply → ${name}`);

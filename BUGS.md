@@ -32,6 +32,15 @@ Updated after every session or fix. Use this file for any active bug, open quest
 | 2026-04-02 | Seamless.ai API access | Pending | Chris to enable — needed for profiles not using Sales Nav |
 | 2026-04-02 | Scale plan: rotating schedule vs second Mac Mini for 24 profiles | Pending | Discuss with Chris/Darren |
 
+## Resolved Bugs
+
+| Date Found | Description | Resolved | Notes |
+|------------|-------------|----------|-------|
+| 2026-04-06 | Expired `ANTHROPIC_API_KEY` in `.env` — valid key was only in shell/openclaw.json env. `messenger.js` had `override: true` on dotenv which stomped the valid key with the stale one on every module load. All production sessions since search exhaustion (April 3–6) sent 0 messages so no malformed content was sent. | 2026-04-06 | Fixed: `.env` updated with valid key; `override: true` removed from messenger.js |
+| 2026-04-06 | `classifyInboxMessage` and `generateInboxReply` called with reversed arg order in `test-run.js` phases 1 & 2 — caused `.map` crash on every inbox thread. | 2026-04-06 | Fixed: corrected to `(config, { contactName, messages, lastMessage })` |
+
+---
+
 ## Auto-logged Session Errors
 <!-- Auto-managed by report.js alertError() -->
 | Date Found | Description | Status | Resolved Date |
