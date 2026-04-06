@@ -200,38 +200,7 @@ async function runSalesNavConnections(page, config, results) {
   results.connectionsent = sent;
 }
 
-// ─── Connect via "..." overflow menu ─────────────────────────────
 
-async function sendViaOverflowMenu(page, leadEl, message, name, nickname) {
-  try {
-    // Click the "..." overflow button on this lead card
-    const moreBtn = leadEl.locator('button[aria-label*="See more actions for"]').first();
-    const visible = await moreBtn.isVisible({ timeout: 3000 }).catch(() => false);
-    if (!visible) return false;
-
-    await moreBtn.click();
-    await sleep(randomBetween(800, 1500));
-
-    // Look for Connect in the dropdown
-    const connectItem = page.locator('[role="menuitem"]:has-text("Connect"), li:has-text("Connect") button').first();
-    const connectVisible = await connectItem.isVisible({ timeout: 3000 }).catch(() => false);
-
-    if (!connectVisible) {
-      await page.keyboard.press('Escape');
-      await sleep(500);
-      return false;
-    }
-
-    await connectItem.click();
-    await sleep(randomBetween(1000, 2000));
-
-    return await fillAndSendInvite(page, message, name, nickname);
-
-  } catch (err) {
-    await page.keyboard.press('Escape').catch(() => {});
-    return false;
-  }
-}
 
 // ─── Connect via Sales Nav lead profile page → actions overflow → Connect ────
 // Verified flow 2026-03-13:
@@ -293,67 +262,7 @@ async function sendViaProfilePage(page, leadEl, message, name, nickname) {
   }
 }
 
-// ─── Connect via profile name click → panel ───────────────────────
 
-async function sendViaProfilePanel(page, leadEl, message, name, nickname) {
-  try {
-    // Dismiss any modal/iframe overlays before clicking
-    await dismissModals(page);
-
-    // Click the lead name to open the right-side profile panel
-    const nameLink = leadEl.locator('[data-control-name="view_lead_panel_via_search_lead_name"]').first();
-    await nameLink.click({ force: true });
-    await sleep(randomBetween(2500, 4000));
-
-    // Panel opens as an aside/drawer — wait for it
-    // Connect button may be direct or inside a "More" overflow
-    // Try direct Connect button first (various Sales Nav panel selectors)
-    const connectSelectors = [
-      'button[data-anchor-connect-lead]',
-      'aside button:has-text("Connect")',
-      '[data-view-name*="profile"] button:has-text("Connect")',
-      '.profile-detail button:has-text("Connect")',
-      'section button:has-text("Connect")',
-    ];
-
-    let connectBtn = null;
-    for (const sel of connectSelectors) {
-      const btn = page.locator(sel).first();
-      if (await btn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        connectBtn = btn;
-        break;
-      }
-    }
-
-    // If not found directly, try the panel's "..." overflow menu
-    if (!connectBtn) {
-      const panelMore = page.locator('aside button[aria-label*="More"], aside button[data-search-overflow-trigger]').first();
-      if (await panelMore.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await panelMore.click();
-        await sleep(randomBetween(800, 1400));
-        const menuConnect = page.locator('[role="menuitem"]:has-text("Connect"), li:has-text("Connect")').first();
-        if (await menuConnect.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await menuConnect.click();
-          await sleep(randomBetween(1000, 2000));
-          return await fillAndSendInvite(page, message, name, nickname);
-        }
-        await page.keyboard.press('Escape').catch(() => {});
-      }
-      // Close panel and give up
-      await page.keyboard.press('Escape').catch(() => {});
-      return false;
-    }
-
-    await connectBtn.click();
-    await sleep(randomBetween(1000, 2000));
-    return await fillAndSendInvite(page, message, name, nickname);
-
-  } catch (err) {
-    console.log(`  panel error: ${err.message.substring(0, 80)}`);
-    await page.keyboard.press('Escape').catch(() => {});
-    return false;
-  }
-}
 
 // ─── Fill invite dialog and send ─────────────────────────────────
 
