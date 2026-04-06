@@ -67,9 +67,9 @@ Updated after every session run. Source of truth for what's active, what's broke
 
 
 
+
+
 ## Search Exhausted Flags
 <!-- Auto-managed by connect-salenav.js — do not edit manually -->
 | Nickname | Search URL | Flagged Date |
 |----------|-----------|-------------- |
-| chris | savedSearchId=1985861058 | 2026-04-03 |
-| nicolepindul | savedSearchId=1985871018 | 2026-04-06 |
