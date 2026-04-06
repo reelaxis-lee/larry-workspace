@@ -99,13 +99,7 @@ async function runSalesNavConnections(page, config, results) {
           continue;
         }
 
-        if (degree === '3rd') {
-          console.log(`  Skip: 3rd degree — InMail candidate`);
-          results.flags = results.flags || [];
-          results.flags.push(`InMail candidate: ${name}, ${title} at ${company}`);
-          skipped++;
-          continue;
-        }
+        // 2nd and 3rd degree both eligible for connection requests — only 1st is skipped
 
         // Check if already saved (contacted)
         const isSaved = await lead.locator('button[aria-label*="Saved"]').first().isVisible({ timeout: 1000 }).catch(() => false);

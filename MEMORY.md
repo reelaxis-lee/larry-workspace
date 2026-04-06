@@ -48,8 +48,8 @@ Fully autonomous LinkedIn outreach system managing up to 24 LinkedIn profiles. R
 3. Verify LinkedIn session
 4. **Inbox check** — read threads, classify intent (Claude), reply to positive/neutral
 5. **Follow-ups** — message connections accepted 3+ days ago, not yet followed up
-6. **Connection requests** — Sales Navigator saved search (Playbook A) or Seamless CSV (Playbook B)
-7. **InMails** — Open Profiles only (free), up to 5/session, dedup via HISTORY.md
+6. **Connection requests** — Sales Navigator saved search (Playbook A) or Seamless CSV (Playbook B). Send to 2nd AND 3rd degree. Skip 1st degree only.
+7. **InMails** — Open Profiles only (free), up to 5/session, dedup via HISTORY.md. Eligible regardless of degree (2nd or 3rd).
 8. Log to HISTORY.md, post Slack report, send Postmark email
 
 ### Daily Limits Per Profile

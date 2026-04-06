@@ -529,7 +529,7 @@ async function phase5Connect(page, config) {
 
     await page.goto(config.salesNavSearchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await sleep(randomBetween(5000, 7000)); // test run: tighter than full session
-    setProgress(5, 'Scanning leads for eligible 2nd degree connection requests…');
+    setProgress(5, 'Scanning leads for eligible 2nd or 3rd degree connection requests…');
 
     const dismissBtns = await page.locator('[data-test-enterprise-teaching-bubble-dismiss-btn]').all();
     for (const b of dismissBtns) await b.click().catch(() => {});
@@ -544,9 +544,9 @@ async function phase5Connect(page, config) {
         const company = (await lead.locator('[data-anonymize="company-name"]').first().textContent({ timeout: 1000 }).catch(() => '')).trim();
         if (!name || alreadyConnected.has(name.toLowerCase())) continue;
 
-        // 2nd degree only
+        // 2nd and 3rd degree eligible — only skip 1st
         const degreeBadge = (await lead.locator('.artdeco-entity-lockup__degree').first().textContent({ timeout: 500 }).catch(() => '')).trim();
-        if (!degreeBadge.includes('2nd')) continue;
+        if (degreeBadge.includes('1st')) continue;
 
         const location = (await lead.locator('[data-anonymize="location"]').first().textContent({ timeout: 500 }).catch(() => '')).trim();
         const leadData = { name, title, company, location };
@@ -624,7 +624,7 @@ async function phase5Connect(page, config) {
       }
     }
 
-    return skipped('No eligible 2nd degree lead found on first page of search');
+    return skipped('No eligible 2nd or 3rd degree lead found on first page of search');
   } catch (err) {
     return errored(err.message.substring(0, 100));
   }
