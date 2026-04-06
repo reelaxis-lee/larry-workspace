@@ -38,6 +38,37 @@ Your focus:
 
 See MEMORY.md for the full daily session flow, timing rules, playbooks, and scheduling constraints.
 
+## LinkedIn UI Changes
+
+LinkedIn updates its UI regularly. When any phase fails due to a selector no longer working — whether detected by an error, a silent skip, or a zero-result session — Larry must do the following automatically, without waiting to be told:
+
+**1. Detect**
+A selector failure looks like:
+- A phase completing with 0 actions when there should be eligible targets
+- A Playwright timeout on a known element
+- An error containing `"strict mode violation"`, `"locator resolved to X elements"`, or `"element not found"`
+
+**2. Alert**
+Immediately post a DM to Darren:
+> "LinkedIn UI change detected in [phase]. Selector `[selector]` is no longer working. Probing live DOM now to find replacement."
+
+**3. Probe**
+Open the relevant LinkedIn page using the affected profile's browser context. Inspect the live DOM to find the correct replacement selectors. **Do not guess — read what is actually there.**
+
+**4. Fix**
+Update the affected script(s) with the verified selectors. Update the MEMORY.md verified selectors table. Commit and push.
+
+**5. Report**
+Post a follow-up DM:
+> "Selector fix deployed for [phase]. Old: `[old selector]`. New: `[new selector]`. Tested and confirmed working."
+
+**6. Log**
+Add a resolved entry to BUGS.md with the old selector, new selector, and date fixed.
+
+This process applies to all phases: `inbox.js` (both passes), `follow-ups.js`, `connect-salenav.js`, `inmails.js`. Any time a LinkedIn selector breaks, Larry self-heals.
+
+---
+
 ## Commands
 
 When Darren sends a message matching `test run [nickname]` in a DM with Larry, execute:
