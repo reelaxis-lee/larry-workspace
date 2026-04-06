@@ -125,7 +125,17 @@ async function runSalesNavConnections(page, config, results) {
         console.log(`  Message (${message.length} chars): "${message.substring(0, 80)}..."`);
 
         // Primary: navigate directly to their LinkedIn profile page and connect from there
-        const ok = await sendViaProfilePage(page, lead, message, name, config.nickname);
+        let ok = false;
+        try {
+          ok = await sendViaProfilePage(page, lead, message, name, config.nickname);
+        } catch (sendErr) {
+          // Only alert on genuine send failures — not on skips or soft failures
+          await alertError(config, 'connections', `send connection request to ${name}`, sendErr.message.substring(0, 200), 'skipped and continued');
+          skipped++;
+          await page.keyboard.press('Escape').catch(() => {});
+          await sleep(randomBetween(2000, 4000));
+          continue;
+        }
 
         if (ok) {
           sent++;
@@ -142,8 +152,8 @@ async function runSalesNavConnections(page, config, results) {
         await dismissTeachingBubbles(page);
 
       } catch (err) {
+        // Outer catch covers lead data reading errors — not alertable, just skip
         console.log(`  Error: ${err.message.substring(0, 100)}`);
-        await alertError(config, 'connections', `send connection request to ${name || 'unknown'}`, err.message.substring(0, 200), 'skipped and continued');
         skipped++;
         await page.keyboard.press('Escape').catch(() => {});
         await sleep(randomBetween(2000, 4000));

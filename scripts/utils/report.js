@@ -234,11 +234,17 @@ function logToHistory(accountConfig, sessionResults) {
     messagessent = 0,
     newConnectionsAccepted = 0,
     positiveReplies = [],
+    inboxRepliesLog = [],
     flags = [],
     searchStatus = 'Active',
     sessionStart,
     sessionEnd,
   } = sessionResults;
+
+  // Write one line per inbox reply so loadRepliedNames() can dedup across sessions
+  const inboxReplyLines = inboxRepliesLog.length > 0
+    ? '\n' + inboxRepliesLog.map(n => `- Inbox reply → ${n}`).join('\n')
+    : '';
 
   const entry = `
 ### ${date}
@@ -246,7 +252,7 @@ function logToHistory(accountConfig, sessionResults) {
 - Connection requests sent: ${connectionsent}
 - Follow-up messages sent: ${messagessent}
 - New connections accepted: ${newConnectionsAccepted}
-- Positive responses: ${positiveReplies.length}
+- Positive responses: ${positiveReplies.length}${inboxReplyLines}
 - Flags/issues: ${flags.length > 0 ? flags.join('; ') : 'none'}
 - Search status: ${searchStatus}
 `;

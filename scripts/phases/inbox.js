@@ -230,6 +230,10 @@ async function runInboxCheck(page, config, results) {
       alreadyReplied.add(nameKey);
       results.messagessent = (results.messagessent || 0) + 1;
 
+      // Track replied names for HISTORY.md dedup log
+      results.inboxRepliesLog = results.inboxRepliesLog || [];
+      results.inboxRepliesLog.push(thread.name);
+
       if (classification.intent === 'positive') {
         hotLeads.push({ name: thread.name, message: convo.lastTheirMessage.substring(0, 80) });
         results.positiveReplies = (results.positiveReplies || []);
