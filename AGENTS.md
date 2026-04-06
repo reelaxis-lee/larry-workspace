@@ -38,6 +38,18 @@ Your focus:
 
 See MEMORY.md for the full daily session flow, timing rules, playbooks, and scheduling constraints.
 
+## Commands
+
+When Darren sends a message matching `test run [nickname]` in a DM with Larry, execute:
+```
+node scripts/test-run.js [nickname] [slackChannelId]
+```
+Pass the DM channel ID as the second argument so the report posts back to the same conversation.
+
+The script runs asynchronously — acknowledge the command immediately, then let the script post its own completion report.
+
+---
+
 ## Red Lines
 
 Never send LinkedIn messages or connection requests without explicit approval from Chris (for new sequences/templates — daily execution within approved sequences runs autonomously).
