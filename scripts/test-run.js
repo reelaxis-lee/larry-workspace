@@ -437,7 +437,7 @@ async function phase4InMail(page, config) {
     if (!config.salesNavSearchUrl) return skipped('No Sales Nav search URL configured');
 
     await page.goto(config.salesNavSearchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await sleep(randomBetween(7000, 10000));
+    await sleep(randomBetween(5000, 7000)); // test run: tighter than full session
     setProgress(4, 'Scanning leads for Open Profile InMail candidates…');
 
     // Dismiss teaching bubbles
@@ -449,18 +449,19 @@ async function phase4InMail(page, config) {
 
     for (const lead of leads) {
       try {
-        const name    = (await lead.locator('[data-anonymize="person-name"]').first().textContent({ timeout: 2000 }).catch(() => '')).trim();
-        const title   = (await lead.locator('[data-anonymize="title"]').first().textContent({ timeout: 2000 }).catch(() => '')).trim();
-        const company = (await lead.locator('[data-anonymize="company-name"]').first().textContent({ timeout: 2000 }).catch(() => '')).trim();
+        const name    = (await lead.locator('[data-anonymize="person-name"]').first().textContent({ timeout: 1000 }).catch(() => '')).trim();
+        const title   = (await lead.locator('[data-anonymize="title"]').first().textContent({ timeout: 1000 }).catch(() => '')).trim();
+        const company = (await lead.locator('[data-anonymize="company-name"]').first().textContent({ timeout: 1000 }).catch(() => '')).trim();
         if (!name || alreadySent.has(name.toLowerCase())) continue;
 
         // Must be 2nd or 3rd degree (skip 1st)
-        const degreeBadge = (await lead.locator('.artdeco-entity-lockup__degree').first().textContent({ timeout: 1000 }).catch(() => '')).trim();
+        const degreeBadge = (await lead.locator('.artdeco-entity-lockup__degree').first().textContent({ timeout: 500 }).catch(() => '')).trim();
         if (degreeBadge.includes('1st')) continue;
 
         // Must have a visible Message button (Open Profile indicator)
+        // Test run: short timeout — don't wait 4s per non-open-profile lead
         const msgBtn = lead.locator(`button[aria-label^="Message "]`).first();
-        if (!await msgBtn.isVisible({ timeout: 4000 }).catch(() => false)) continue;
+        if (!await msgBtn.isVisible({ timeout: 800 }).catch(() => false)) continue;
 
         // Confirm it's an Open Profile (not a credit InMail)
         const creditCheck = lead.locator('button[aria-label*="InMail credits renewal"]');
@@ -527,7 +528,7 @@ async function phase5Connect(page, config) {
     if (!config.salesNavSearchUrl) return skipped('No Sales Nav search URL configured');
 
     await page.goto(config.salesNavSearchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await sleep(randomBetween(7000, 10000));
+    await sleep(randomBetween(5000, 7000)); // test run: tighter than full session
     setProgress(5, 'Scanning leads for eligible 2nd degree connection requests…');
 
     const dismissBtns = await page.locator('[data-test-enterprise-teaching-bubble-dismiss-btn]').all();
@@ -538,21 +539,21 @@ async function phase5Connect(page, config) {
 
     for (const lead of leads) {
       try {
-        const name    = (await lead.locator('[data-anonymize="person-name"]').first().textContent({ timeout: 2000 }).catch(() => '')).trim();
-        const title   = (await lead.locator('[data-anonymize="title"]').first().textContent({ timeout: 2000 }).catch(() => '')).trim();
-        const company = (await lead.locator('[data-anonymize="company-name"]').first().textContent({ timeout: 2000 }).catch(() => '')).trim();
+        const name    = (await lead.locator('[data-anonymize="person-name"]').first().textContent({ timeout: 1000 }).catch(() => '')).trim();
+        const title   = (await lead.locator('[data-anonymize="title"]').first().textContent({ timeout: 1000 }).catch(() => '')).trim();
+        const company = (await lead.locator('[data-anonymize="company-name"]').first().textContent({ timeout: 1000 }).catch(() => '')).trim();
         if (!name || alreadyConnected.has(name.toLowerCase())) continue;
 
         // 2nd degree only
-        const degreeBadge = (await lead.locator('.artdeco-entity-lockup__degree').first().textContent({ timeout: 1000 }).catch(() => '')).trim();
+        const degreeBadge = (await lead.locator('.artdeco-entity-lockup__degree').first().textContent({ timeout: 500 }).catch(() => '')).trim();
         if (!degreeBadge.includes('2nd')) continue;
 
-        const location = (await lead.locator('[data-anonymize="location"]').first().textContent({ timeout: 1000 }).catch(() => '')).trim();
+        const location = (await lead.locator('[data-anonymize="location"]').first().textContent({ timeout: 500 }).catch(() => '')).trim();
         const leadData = { name, title, company, location };
 
         const message = await generateConnectionRequest(config, leadData);
 
-        // Navigate to lead's Sales Nav profile page
+        // Navigate to lead's Sales Nav profile page (required for overflow menu connect flow)
         const searchUrl = page.url();
         const leadHref = await lead.locator('[data-control-name="view_lead_panel_via_search_lead_name"]').first()
           .getAttribute('href').catch(() => null);
@@ -560,7 +561,7 @@ async function phase5Connect(page, config) {
 
         const leadUrl = leadHref.startsWith('http') ? leadHref : `https://www.linkedin.com${leadHref}`;
         await page.goto(leadUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        await sleep(randomBetween(3000, 5000));
+        await sleep(randomBetween(2000, 3000)); // test run: tighter
 
         // Open actions overflow menu
         const moreBtn = page.locator('button[aria-label="Open actions overflow menu"]').first();
