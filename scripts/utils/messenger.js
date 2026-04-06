@@ -24,19 +24,27 @@ try {
  * Generate a personalized connection request message (max 300 chars).
  */
 async function generateConnectionRequest(accountConfig, leadProfile) {
-  const prompt = `You are writing a LinkedIn connection request for ${accountConfig.name}.
+  const leadFirstName = leadProfile.name ? leadProfile.name.split(' ')[0] : 'there';
+  const prompt = `You are writing a LinkedIn connection request MESSAGE.
+
+SENDER (the person sending the request): ${accountConfig.name}
+RECIPIENT (the person receiving the request): ${leadProfile.name}
+
+The message is written BY ${accountConfig.name} TO ${leadProfile.name}.
+Never address ${accountConfig.name} by name — they are the sender, not the recipient.
+If you use a salutation, use ${leadFirstName}'s name, not the sender's.
 
 === GLOBAL RULES (override everything else) ===
 ${GLOBAL_RULES}
 === END GLOBAL RULES ===
 
-ABOUT ${accountConfig.name.toUpperCase()}:
+ABOUT THE SENDER (${accountConfig.name}):
 ${accountConfig.offerDescription}
 
 VOICE & TONE:
 ${accountConfig.voiceTone}
 
-LEAD PROFILE:
+RECIPIENT PROFILE:
 Name: ${leadProfile.name}
 Title: ${leadProfile.title}
 Company: ${leadProfile.company}
@@ -49,11 +57,11 @@ Recent activity: ${leadProfile.recentActivity || 'none'}
 RULES:
 - Maximum 300 characters (HARD LIMIT — count carefully)
 - Target 240–285 characters
-- Must sound like ${accountConfig.name} wrote it personally
-- Reference a specific detail from the lead's profile
+- Written from ${accountConfig.name}'s perspective, addressed to ${leadProfile.name}
+- Reference a specific detail from the recipient's profile
 - No pitch in connection requests — just connect
 - No links
-- Never start with "Hi [Name]" every time — vary openers
+- Vary your openers — do not always start with the recipient's name
 
 BANNED PHRASES: ${accountConfig.bannedPhrases || 'synergy, leverage, circle back, touch base, cutting-edge'}
 
