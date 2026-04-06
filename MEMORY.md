@@ -125,15 +125,8 @@ Must include `## Log` header or `logToHistory()` silently fails and `hasRunToday
 ## Log
 ```
 
-### config-loader.js — ACCOUNT.md Section Mapping
-| Config field | ACCOUNT.md section |
-|---|---|
-| `offerDescription` | `## OFFER & VALUE PROP` + `## CTA & MESSAGING` (combined) |
-| `voiceTone` | `## TONE & VOICE` |
-| `followUpGuidance` | `## FOLLOW-UP MESSAGE GUIDANCE` |
-| `inMailGuidance` | `## INMAIL GUIDANCE` |
-| `postEngagementGuidance` | `## POST ENGAGEMENT GUIDANCE` |
-| `icp` | `## TARGET ICP` |
+### config-loader.js
+`config-loader.js` reads from `profiles/[nickname]/account.json`. ACCOUNT.md is reference only and is no longer parsed. See account.json schema in Step 6 notes (2026-04-02 memory file).
 
 ---
 

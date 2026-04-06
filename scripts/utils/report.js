@@ -16,15 +16,14 @@ const BUGS_PATH = path.resolve(__dirname, '../../BUGS.md');
 async function postSlackMessage(message) {
   const http = require('http');
   const body = JSON.stringify({
-    channel: 'slack',
-    target: SLACK_REPORT_CHANNEL,
-    message,
+    tool: 'message',
+    args: { action: 'send', target: SLACK_REPORT_CHANNEL, message },
   });
   await new Promise((resolve, reject) => {
     const req = http.request({
       hostname: '127.0.0.1',
       port: parseInt(process.env.OPENCLAW_GATEWAY_PORT || '18789'),
-      path: '/api/message/send',
+      path: '/tools/invoke',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -261,6 +260,54 @@ function logToHistory(accountConfig, sessionResults) {
   const updated = current.replace('## Log', `## Log\n${entry}`);
   fs.writeFileSync(historyPath, updated);
   console.log(`[report] History logged to ${historyPath}`);
+
+  // Also update the Last Run Summary table in STATUS.md
+  updateStatusLastRun(accountConfig, sessionResults);
+}
+
+/**
+ * Rewrite the current profile's row in STATUS.md "Last Run Summary" table.
+ */
+function updateStatusLastRun(accountConfig, sessionResults) {
+  const statusPath = path.resolve(__dirname, '../../STATUS.md');
+  if (!fs.existsSync(statusPath)) return;
+
+  const {
+    date,
+    connectionsent   = 0,
+    messagessent     = 0,
+    inboxRepliesLog  = [],
+    flags            = [],
+    searchStatus     = 'Active',
+  } = sessionResults;
+
+  const nickname     = accountConfig.nickname;
+  const inMailsSent  = sessionResults.inMailsSent || 0;
+  const notes        = flags.length > 0 ? flags[0].substring(0, 40) : searchStatus;
+  const newRow       = `| ${nickname} | ${connectionsent} | ${messagessent} | ${inMailsSent} | ${inboxRepliesLog.length} | ${notes} |`;
+
+  let content = fs.readFileSync(statusPath, 'utf8');
+
+  // Update the date in the section header
+  content = content.replace(
+    /## Last Run Summary \([^)]+\)/,
+    `## Last Run Summary (${date})`
+  );
+
+  // Replace existing row for this nickname, or append it
+  const rowRegex = new RegExp(`\\| ${nickname} \\|[^\\n]*`, 'm');
+  if (rowRegex.test(content)) {
+    content = content.replace(rowRegex, newRow);
+  } else {
+    // Append after table header row inside Last Run Summary
+    content = content.replace(
+      /(## Last Run Summary[\s\S]*?\|[-| ]+\|\n)/,
+      `$1${newRow}\n`
+    );
+  }
+
+  fs.writeFileSync(statusPath, content);
+  console.log(`[report] STATUS.md last run updated for ${nickname}`);
 }
 
 module.exports = { sendSessionReport, logToHistory, postSlackReport, alertError, postSlackMessage };

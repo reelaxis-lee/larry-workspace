@@ -34,11 +34,14 @@ const CRITICAL_FILES = [
 // ─── Slack helper ─────────────────────────────────────────────────
 function postSlack(message) {
   return new Promise((resolve) => {
-    const body = JSON.stringify({ channel: 'slack', target: SLACK_CHANNEL, message });
+    const body = JSON.stringify({
+      tool: 'message',
+      args: { action: 'send', target: SLACK_CHANNEL, message },
+    });
     const req = http.request({
       hostname: '127.0.0.1',
       port: OPENCLAW_PORT,
-      path: '/api/message/send',
+      path: '/tools/invoke',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -56,22 +56,25 @@ function getLocalTimeString(timezone) {
   return new Date().toLocaleTimeString('en-US', { timeZone: timezone, hour12: true });
 }
 
-// Read timezone from profile's ACCOUNT.md
+// Read timezone from profile's account.json (source of truth)
 function getProfileTimezone(nickname) {
-  const accountPath = path.join(PROFILES_DIR, nickname, 'ACCOUNT.md');
-  if (!fs.existsSync(accountPath)) return 'America/Los_Angeles';
-  const content = fs.readFileSync(accountPath, 'utf8');
-  const match = content.match(/\|\s*Timezone\s*\|\s*([^\|\n]+)\|/);
-  return match ? match[1].trim() : 'America/Los_Angeles';
+  const jsonPath = path.join(PROFILES_DIR, nickname, 'account.json');
+  if (!fs.existsSync(jsonPath)) return 'America/Los_Angeles';
+  try {
+    const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+    return data.timezone || 'America/Los_Angeles';
+  } catch (_) {
+    return 'America/Los_Angeles';
+  }
 }
 
-// Get all active profiles (have ACCOUNT.md + browser-context)
+// Get all active profiles (have account.json + browser-context)
 function getActiveProfiles() {
   return fs.readdirSync(PROFILES_DIR)
     .filter(name => {
       const dir = path.join(PROFILES_DIR, name);
       return fs.statSync(dir).isDirectory() &&
-             fs.existsSync(path.join(dir, 'ACCOUNT.md')) &&
+             fs.existsSync(path.join(dir, 'account.json')) &&
              fs.existsSync(path.join(dir, 'browser-context'));
     });
 }

@@ -558,10 +558,11 @@ function generateAccountJson(nickname, i, templates) {
       i.icp?.companySize       ? `Company size: ${i.icp.companySize}.`           : '',
       i.icp?.geography         ? `Geography: ${i.icp.geography}.`                : '',
     ].filter(Boolean).join(' '),
-    offerDescription:   i.offer   || '',
-    voiceTone:          i.tone    || '',
-    followUpGuidance:   i.followUpGuidance || '',
-    inMailGuidance:     i.inMailGuidance   || '',
+    offerDescription:        i.offerDescription  || i.offer || '',
+    voiceTone:               i.tone              || '',
+    followUpGuidance:        i.followUpGuidance  || '',
+    inMailGuidance:          i.inMailGuidance    || '',
+    postEngagementGuidance:  '',
     messageTemplates: {
       connectionRequest: {
         a: templates?.connectionRequest || '',
@@ -586,22 +587,8 @@ function generateAccountJson(nickname, i, templates) {
 }
 
 async function notifySlackIntake(intake, nickname) {
-  try {
-    const token = process.env.OPENCLAW_GATEWAY_TOKEN;
-    const port = process.env.OPENCLAW_GATEWAY_PORT || 18789;
-    if (!token) return;
-
-    await fetch(`http://localhost:${port}/api/v1/send`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        channel: 'C0ALWJRPQ6R',
-        message: `🆕 New profile intake received: *${intake.name}* (${intake.company})\n\nProfile folder: \`profiles/${nickname}/\`\n✅ \`account.json\` created (source of truth)\n✅ \`ACCOUNT.md\` created (reference copy)\n✅ \`HISTORY.md\` created\n\n*Still needed before first run:*\n1. Configure Bright Data proxy zone (update \`account.json\` or \`.env\`)\n2. Set Sales Navigator search URL in \`account.json\` if not provided\n3. Run setup-profile.js to save browser context`,
-      }),
-    });
-  } catch (e) {
-    console.error('[webhook] Slack notify failed:', e.message);
-  }
+  const message = `🆕 New profile intake received: *${intake.fullName || intake.name}* (${intake.company})\n\nProfile folder: \`profiles/${nickname}/\`\n✅ \`account.json\` created (source of truth)\n✅ \`ACCOUNT.md\` created (reference copy)\n✅ \`HISTORY.md\` created\n\n*Still needed before first run:*\n1. Configure Bright Data proxy zone (update \`account.json\` or \`.env\`)\n2. Set Sales Navigator search URL in \`account.json\` if not provided\n3. Run setup-profile.js to save browser context`;
+  await postSlackGateway(message);
 }
 
 // ── Cleanup old sessions every 30 min ────────────────────────────────────────
@@ -612,24 +599,35 @@ setInterval(() => {
   }
 }, 30 * 60 * 1000);
 
+// ── Slack gateway helper (shared by all webhook notifications) ───────────────
+function postSlackGateway(message) {
+  const http = require('http');
+  const token = process.env.OPENCLAW_GATEWAY_TOKEN;
+  const port  = parseInt(process.env.OPENCLAW_GATEWAY_PORT || '18789');
+  if (!token) return Promise.resolve();
+  const body = JSON.stringify({
+    tool: 'message',
+    args: { action: 'send', target: 'C0ALWJRPQ6R', message },
+  });
+  return new Promise((resolve) => {
+    const req = http.request({
+      hostname: '127.0.0.1', port,
+      path: '/tools/invoke', method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, res => { res.resume(); res.on('end', resolve); });
+    req.on('error', e => { console.error('[webhook] Slack notify failed:', e.message); resolve(); });
+    req.write(body); req.end();
+  });
+}
+
 // ── Slack notification ────────────────────────────────────────────────────────
 async function notifySlack(nickname) {
-  try {
-    const token = process.env.OPENCLAW_GATEWAY_TOKEN;
-    const port = process.env.OPENCLAW_GATEWAY_PORT || 18789;
-    if (!token) return;
-
-    await fetch(`http://localhost:${port}/api/v1/send`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        channel: 'C0ALWJRPQ6R',
-        message: `✅ LinkedIn session saved for *${nickname}* — ready to run.\n\nStill needed:\n1. Set Chrome profile path in \`profiles/${nickname}/ACCOUNT.md\`\n2. Profile will run at next scheduler cycle`,
-      }),
-    });
-  } catch (e) {
-    console.error('[webhook] Slack notify failed:', e.message);
-  }
+  const message = `✅ LinkedIn session saved for *${nickname}* — ready to run.\n\nStill needed:\n1. Configure Bright Data proxy zone in \`account.json\` or \`.env\`\n2. Profile will run at next scheduler cycle`;
+  await postSlackGateway(message);
 }
 
 app.listen(PORT, () => {

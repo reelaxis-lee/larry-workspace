@@ -64,8 +64,9 @@ function loadAccountConfig(nickname) {
     offerDescription:     raw.offerDescription  || '',
     voiceTone:            raw.voiceTone          || '',
     followUpGuidance:     raw.followUpGuidance   || '',
-    inMailGuidance:       raw.inMailGuidance      || '',
-    bannedPhrases:        raw.bannedPhrases       || 'synergy, leverage, circle back, touch base, cutting-edge, em dashes',
+    inMailGuidance:            raw.inMailGuidance           || '',
+    postEngagementGuidance:    raw.postEngagementGuidance   || '',
+    bannedPhrases:             raw.bannedPhrases             || 'synergy, leverage, circle back, touch base, cutting-edge, em dashes',
 
     // ── Message templates ─────────────────────────────────────
     messageTemplates: raw.messageTemplates || {

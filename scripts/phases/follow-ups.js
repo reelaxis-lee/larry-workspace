@@ -208,30 +208,4 @@ async function extractQualifiedConnections(page) {
   });
 }
 
-/**
- * Parse "Connected on March 17, 2026" and return true if 3+ days ago.
- */
-function isOldEnough(connectedText) {
-  if (!connectedText) return false;
-
-  // Try to parse "Connected on [Month] [Day], [Year]"
-  const match = connectedText.match(/Connected on (\w+ \d+, \d{4})/);
-  if (match) {
-    const connectedDate = new Date(match[1]);
-    if (!isNaN(connectedDate.getTime())) {
-      const daysDiff = (Date.now() - connectedDate.getTime()) / (1000 * 60 * 60 * 24);
-      return daysDiff >= 3;
-    }
-  }
-
-  // Fallback: "X days ago"
-  const daysMatch = connectedText.match(/(\d+)\s+day/);
-  if (daysMatch) return parseInt(daysMatch[1]) >= 3;
-
-  // "X weeks/months/years ago" — always old enough
-  if (/week|month|year/.test(connectedText.toLowerCase())) return true;
-
-  return false;
-}
-
 module.exports = { runFollowUps };
