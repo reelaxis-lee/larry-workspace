@@ -468,7 +468,7 @@ async function phase4InMail(page, config) {
 
         const location = (await lead.locator('[data-anonymize="location"]').first().textContent({ timeout: 1000 }).catch(() => '')).trim();
         const leadData = { name, title, company, location };
-        const { subject, body } = await generateInMail(leadData, config);
+        const { subject, body } = await generateInMail(config, leadData);
 
         await msgBtn.click();
         await sleep(randomBetween(2000, 3000));
@@ -550,7 +550,7 @@ async function phase5Connect(page, config) {
         const location = (await lead.locator('[data-anonymize="location"]').first().textContent({ timeout: 1000 }).catch(() => '')).trim();
         const leadData = { name, title, company, location };
 
-        const message = await generateConnectionRequest(leadData, config);
+        const message = await generateConnectionRequest(config, leadData);
 
         // Navigate to lead's Sales Nav profile page
         const searchUrl = page.url();
