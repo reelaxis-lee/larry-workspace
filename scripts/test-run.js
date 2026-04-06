@@ -1,19 +1,23 @@
 /**
- * test-run.js — Manually triggered mini-session (one action per phase)
+ * test-run.js — DRY RUN preview (one eligible target per phase, nothing sent)
  *
  * Usage: node scripts/test-run.js <nickname> [replyChannelId]
  * Example: node scripts/test-run.js darren D0AL85W960J
  *
- * Bypasses hasRunToday(). All sends go through messenger.js with GLOBAL.md rules.
- * All sent actions are written to HISTORY.md to prevent duplicates in future runs.
- * Does NOT update STATUS.md last run summary.
+ * DRY RUN rules:
+ *   - All 5 phases navigate, find eligible targets, and generate real messages via Claude
+ *   - Nothing is ever sent — no .click() on send buttons, no .type() into compose boxes
+ *   - Nothing is written to HISTORY.md or STATUS.md
+ *   - Reasoning guardrails still apply: if Claude output looks like internal reasoning,
+ *     it is flagged in the report instead of shown as the preview message
+ *   - The Slack report shows exactly what WOULD have been sent for review
  *
- * Phases (1 action each):
+ * Phases (1 eligible target each):
  *   1. LinkedIn inbox reply (linkedin.com/messaging)
  *   2. Sales Nav inbox reply (linkedin.com/sales/inbox)
  *   3. Follow-up to an accepted connection (3+ days old)
  *   4. InMail to an Open Profile from saved search
- *   5. Connection request to a 2nd degree lead from saved search
+ *   5. Connection request to a 2nd or 3rd degree lead from saved search
  */
 
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
@@ -126,9 +130,10 @@ function loadConnectedNames(nick) {
 }
 
 // ─── Result shape ─────────────────────────────────────────────────────────────
-function skipped(reason)           { return { status: 'Skipped', reason, name: '—', title: '', company: '', messageSent: '' }; }
-function sent(data)                { return { status: 'Sent', reason: '', ...data }; }
-function errored(reason)           { return { status: 'Error', reason, name: '—', title: '', company: '', messageSent: '' }; }
+function skipped(reason)           { return { status: 'Skipped',   reason, name: '—', title: '', company: '', messageSent: '' }; }
+function dryRun(data)              { return { status: 'DRY RUN',   reason: '', ...data }; }
+function guardrail(name, pattern)  { return { status: 'GUARDRAIL', reason: `Pattern matched: ${pattern}`, name, title: '', company: '', messageSent: '' }; }
+function errored(reason)           { return { status: 'Error',     reason, name: '—', title: '', company: '', messageSent: '' }; }
 
 // ─── Safety guardrail — never send internal reasoning text ───────────────────
 // If Claude outputs meta-reasoning instead of a reply (e.g. because it detected
@@ -200,34 +205,16 @@ async function phase1LinkedInInbox(page, config) {
         // Generate reply
         const reply = await generateInboxReply(config, { contactName: name, messages, lastMessage: last.text, intent: classification.intent });
 
-        // Safety guardrail: never send internal reasoning text to a real person
-        if (!reply || looksLikeInternalReasoning(reply)) {
-          console.log(`[test-run] LinkedIn inbox — guardrail blocked send to ${name}: reply looks like internal reasoning`);
-          continue;
+        // Reasoning guardrail — check before any send action
+        const triggeredPattern = INTERNAL_REASONING_PATTERNS.find(p => p.test(reply));
+        if (!reply || triggeredPattern) {
+          console.log(`[test-run] LinkedIn inbox — guardrail triggered for ${name}`);
+          return guardrail(name, String(triggeredPattern));
         }
 
-        // Send reply
-        const editor = page.locator('.msg-form__contenteditable[contenteditable="true"]').first();
-        if (!await editor.isVisible({ timeout: 3000 }).catch(() => false)) continue;
-        await editor.click();
-        await sleep(500);
-        await page.keyboard.type(reply, { delay: randomBetween(30, 60) });
-        await sleep(randomBetween(800, 1500));
-
-        // Submit
-        const sendBtn = page.locator('button.msg-form__send-button, button[type="submit"].msg-form__send-btn').first();
-        if (!await sendBtn.isEnabled({ timeout: 3000 }).catch(() => false)) {
-          // Try keyboard submit
-          await page.keyboard.press('Enter');
-        } else {
-          await sendBtn.click();
-        }
-        await sleep(randomBetween(1500, 2500));
-
-        // Log to HISTORY.md
-        appendToHistory(config.nickname, `- Inbox reply → ${name}`);
-
-        return sent({ name, title: '', company: '', messageSent: reply });
+        // DRY RUN — do not send, do not write to HISTORY.md
+        console.log(`[test-run] LinkedIn inbox — DRY RUN: would send to ${name}`);
+        return dryRun({ name, title: '', company: '', messageSent: reply });
 
       } catch (threadErr) {
         console.log(`[test-run] LinkedIn inbox thread error: ${threadErr.message.substring(0, 80)}`);
@@ -292,34 +279,16 @@ async function phase2SalesNavInbox(page, config) {
 
         const reply = await generateInboxReply(config, { contactName: name, messages, lastMessage: last.text, intent: classification.intent });
 
-        // Safety guardrail: never send internal reasoning text to a real person
-        if (!reply || looksLikeInternalReasoning(reply)) {
-          console.log(`[test-run] Sales Nav inbox — guardrail blocked send to ${name}: reply looks like internal reasoning`);
-          continue;
+        // Reasoning guardrail — check before any send action
+        const triggeredPattern = INTERNAL_REASONING_PATTERNS.find(p => p.test(reply));
+        if (!reply || triggeredPattern) {
+          console.log(`[test-run] Sales Nav inbox — guardrail triggered for ${name}`);
+          return guardrail(name, String(triggeredPattern));
         }
 
-        // Verified compose selector: textarea[placeholder="Type your message here…"]
-        // Send button: button[data-sales-action] (disabled until text typed)
-        const textarea = page.locator('textarea[placeholder="Type your message here…"]').first();
-        if (!await textarea.isVisible({ timeout: 4000 }).catch(() => false)) continue;
-        await textarea.click();
-        await sleep(500);
-        await textarea.type(reply, { delay: randomBetween(30, 60) });
-        await sleep(randomBetween(800, 1500));
-
-        // Wait for send button to enable
-        const sendBtn = page.locator('button[data-sales-action]').first();
-        let sendReady = false;
-        for (let attempt = 0; attempt < 8; attempt++) {
-          if (await sendBtn.isEnabled({ timeout: 500 }).catch(() => false)) { sendReady = true; break; }
-          await sleep(500);
-        }
-        if (!sendReady) continue;
-        await sendBtn.click();
-        await sleep(randomBetween(1500, 2500));
-
-        appendToHistory(config.nickname, `- Inbox reply → ${name}`);
-        return sent({ name, title: '', company: '', messageSent: reply });
+        // DRY RUN — do not send, do not write to HISTORY.md
+        console.log(`[test-run] Sales Nav inbox — DRY RUN: would send to ${name}`);
+        return dryRun({ name, title: '', company: '', messageSent: reply });
 
       } catch (threadErr) {
         console.log(`[test-run] Sales Nav inbox thread error: ${threadErr.message.substring(0, 80)}`);
@@ -396,41 +365,9 @@ async function phase3FollowUp(page, config) {
           const message = await generateFollowUp(config, lead).catch(() => null);
           if (!message) continue;
 
-          // Navigate to compose URL
-          const composeUrl = data.msgHref.startsWith('http')
-            ? data.msgHref
-            : `https://www.linkedin.com${data.msgHref}`;
-          await page.goto(composeUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
-          await sleep(randomBetween(3000, 4000));
-
-          const replyBox = page.locator('.msg-form__contenteditable[contenteditable="true"]').first();
-          if (!await replyBox.isVisible({ timeout: 6000 }).catch(() => false)) continue;
-
-          await replyBox.click();
-          await sleep(400);
-          await page.keyboard.press('Control+a');
-          await page.keyboard.press('Delete');
-          await sleep(200);
-          await page.keyboard.type(message, { delay: randomBetween(30, 60) });
-          await page.evaluate(() => {
-            const el = document.querySelector('.msg-form__contenteditable');
-            if (el) el.dispatchEvent(new Event('input', { bubbles: true }));
-          }).catch(() => null);
-          await sleep(randomBetween(800, 1500));
-
-          const sendBtn = page.locator('.msg-form__send-button').first();
-          let sendReady = false;
-          for (let attempt = 0; attempt < 10; attempt++) {
-            if (await sendBtn.isEnabled({ timeout: 500 }).catch(() => false)) { sendReady = true; break; }
-            await sleep(400);
-          }
-          if (!sendReady) continue;
-
-          await sendBtn.click({ timeout: 5000 });
-          await sleep(randomBetween(1500, 2000));
-
-          appendToHistory(config.nickname, `- Follow-up → ${data.name}`);
-          return sent({ name: data.name, title: data.occupation, company: '', messageSent: message });
+          // DRY RUN — do not navigate to compose URL, do not send, do not write to HISTORY.md
+          console.log(`[test-run] Follow-up — DRY RUN: would send to ${data.name}`);
+          return dryRun({ name: data.name, title: data.occupation, company: '', messageSent: message });
 
         } catch (cardErr) {
           console.log(`[test-run] Follow-up card error: ${cardErr.message.substring(0, 80)}`);
@@ -504,43 +441,9 @@ async function phase4InMail(page, config) {
         const leadData = { name, title, company, location };
         const { subject, body } = await generateInMail(config, leadData);
 
-        await msgBtn.click();
-        await sleep(randomBetween(2000, 3000));
-
-        // Subject
-        const subjectInput = page.locator('input[name="subject"], input[placeholder*="subject" i]').first();
-        if (await subjectInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await subjectInput.click();
-          await page.keyboard.type(subject, { delay: randomBetween(40, 80) });
-          await sleep(randomBetween(500, 1000));
-          await page.keyboard.press('Tab');
-          await sleep(randomBetween(500, 800));
-        }
-
-        // Body
-        const bodyInput = page.locator('textarea[name="message"], .msg-form__contenteditable[contenteditable]').first();
-        if (await bodyInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await bodyInput.click({ force: true });
-          await sleep(500);
-          await page.keyboard.type(body, { delay: randomBetween(30, 60) });
-          await sleep(randomBetween(800, 1500));
-        }
-
-        // Wait for Send to enable + click
-        let sendBtn = null;
-        for (let attempt = 0; attempt < 10; attempt++) {
-          const btn = page.locator('button:has-text("Send")').first();
-          if (await btn.isEnabled({ timeout: 500 }).catch(() => false)) { sendBtn = btn; break; }
-          await sleep(500);
-        }
-        if (!sendBtn) { await page.keyboard.press('Escape').catch(() => {}); continue; }
-
-        await sendBtn.click();
-        await sleep(randomBetween(2000, 3000));
-        await page.keyboard.press('Escape').catch(() => {});
-
-        appendToHistory(config.nickname, `- InMail → ${name}`);
-        return sent({ name, title, company, subject, messageSent: body });
+        // DRY RUN — do not click Message button, do not send, do not write to HISTORY.md
+        console.log(`[test-run] InMail — DRY RUN: would send to ${name}`);
+        return dryRun({ name, title, company, subject, messageSent: body });
 
       } catch (leadErr) {
         console.log(`[test-run] InMail lead error: ${leadErr.message.substring(0, 80)}`);
@@ -586,70 +489,10 @@ async function phase5Connect(page, config) {
 
         const message = await generateConnectionRequest(config, leadData);
 
-        // Navigate to lead's Sales Nav profile page (required for overflow menu connect flow)
-        const searchUrl = page.url();
-        const leadHref = await lead.locator('[data-control-name="view_lead_panel_via_search_lead_name"]').first()
-          .getAttribute('href').catch(() => null);
-        if (!leadHref) continue;
-
-        const leadUrl = leadHref.startsWith('http') ? leadHref : `https://www.linkedin.com${leadHref}`;
-        await page.goto(leadUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        await sleep(randomBetween(2000, 3000)); // test run: tighter
-
-        // Open actions overflow menu
-        const moreBtn = page.locator('button[aria-label="Open actions overflow menu"]').first();
-        if (!await moreBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-          await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-          await sleep(randomBetween(2000, 3000));
-          continue;
-        }
-        await moreBtn.click();
-        await sleep(randomBetween(800, 1400));
-
-        const connectItem = page.locator('li:has-text("Connect"):not(:has-text("View")):not(:has-text("Copy"))').first();
-        if (!await connectItem.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await page.keyboard.press('Escape').catch(() => {});
-          await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-          await sleep(randomBetween(2000, 3000));
-          continue;
-        }
-        await connectItem.click();
-        await sleep(randomBetween(1200, 2000));
-
-        // Fill invite dialog
-        const addNoteBtn = page.locator('button:has-text("Add a note")').first();
-        if (await addNoteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await addNoteBtn.click();
-          await sleep(randomBetween(600, 1200));
-        }
-
-        const textarea = page.locator('textarea[name="message"], textarea#custom-message, [role="dialog"] textarea').first();
-        if (!await textarea.isVisible({ timeout: 4000 }).catch(() => false)) {
-          // No note field — send without note
-          const sendBtn = page.locator('button:has-text("Send"), button:has-text("Send invitation")').first();
-          if (await sendBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await sendBtn.click();
-            await sleep(randomBetween(1000, 2000));
-            appendToHistory(config.nickname, `- Connect → ${name}`);
-            await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-            return sent({ name, title, company, messageSent: '(no note — connection sent without message)' });
-          }
-          continue;
-        }
-
-        await textarea.fill('');
-        await textarea.type(message, { delay: randomBetween(30, 60) });
-        await sleep(randomBetween(800, 1500));
-
-        const sendBtn = page.locator('button:has-text("Send"), button:has-text("Send invitation")').first();
-        if (!await sendBtn.isVisible({ timeout: 3000 }).catch(() => false)) continue;
-        await sendBtn.click();
-        await sleep(randomBetween(1200, 2000));
-
-        appendToHistory(config.nickname, `- Connect → ${name}`);
-        await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-        await sleep(randomBetween(2000, 3000));
-        return sent({ name, title, company, messageSent: message });
+        // DRY RUN — do not navigate to lead profile, do not send, do not write to HISTORY.md
+        // (Profile navigation is only needed for the send flow via overflow menu)
+        console.log(`[test-run] Connection request — DRY RUN: would send to ${name}`);
+        return dryRun({ name, title, company, messageSent: message });
 
       } catch (leadErr) {
         console.log(`[test-run] Connect lead error: ${leadErr.message.substring(0, 80)}`);
@@ -666,7 +509,7 @@ async function phase5Connect(page, config) {
 // ─── Format Slack report ──────────────────────────────────────────────────────
 function formatReport(nickname, results, startTime) {
   const ts = new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles', dateStyle: 'short', timeStyle: 'short' });
-  const totalSent = results.filter(r => r.status === 'Sent').length;
+  const totalWouldSend = results.filter(r => r.status === 'DRY RUN').length;
 
   const labels = [
     'LinkedIn inbox reply',
@@ -678,18 +521,21 @@ function formatReport(nickname, results, startTime) {
 
   const lines = results.map((r, i) => {
     const label = labels[i];
-    if (r.status === 'Sent') {
-      const to = [r.name, r.title, r.company].filter(Boolean).join(' · ');
-      const msgLine = r.subject
+    const to = [r.name, r.title, r.company].filter(s => s && s !== '—').join(' · ') || r.name;
+
+    if (r.status === 'DRY RUN') {
+      const msgBlock = r.subject
         ? `Subject: "${r.subject}"\n   Body: "${r.messageSent}"`
-        : `Message: "${r.messageSent}"`;
-      return `${i + 1}. ${label}\n   To: ${to}\n   ${msgLine}\n   Status: ✅ Sent`;
+        : `Would send: "${r.messageSent}"`;
+      return `${i + 1}. ${label}\n   To: ${to}\n   ${msgBlock}\n   Status: DRY RUN — not sent`;
+    } else if (r.status === 'GUARDRAIL') {
+      return `${i + 1}. ${label}\n   To: ${to}\n   Status: ⚠️ GUARDRAIL TRIGGERED — ${r.reason}`;
     } else {
       return `${i + 1}. ${label}\n   Status: ⏭️ ${r.status}${r.reason ? ` — ${r.reason}` : ''}`;
     }
   });
 
-  return `*TEST RUN COMPLETE — ${nickname} — ${ts}*\n\n${lines.join('\n\n')}\n\n*Total sent: ${totalSent}/5*`;
+  return `*TEST RUN COMPLETE (DRY RUN) — ${nickname} — ${ts}*\n_No messages were sent. This is a preview only._\n\n${lines.join('\n\n')}\n\n*Total would send: ${totalWouldSend}/5*`;
 }
 
 // ─── Progress state (updated by each phase, read by heartbeat) ───────────────
@@ -763,7 +609,7 @@ async function runTestSession() {
   try {
     const config = loadAccountConfig(nickname);
     console.log(`[test-run] Starting test session for: ${nickname} (${config.name})`);
-    await postSlack(`🧪 *Test run starting for ${nickname}…* (5 phases — will report back when complete)`);
+    await postSlack(`🧪 *Dry run starting for ${nickname}…* (5 phases, preview only — no messages will be sent)`);
 
     // Start 60s heartbeat
     const heartbeat = startHeartbeat(startTime, replyChannel);

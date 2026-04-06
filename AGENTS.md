@@ -77,6 +77,8 @@ node scripts/test-run.js [nickname] [slackChannelId]
 ```
 Pass the DM channel ID as the second argument so the report posts back to the same conversation.
 
+The script runs in **dry-run mode permanently** — it navigates, finds eligible targets, and generates real messages via Claude, but never sends anything. No send buttons are clicked, no compose boxes are typed into, nothing is written to HISTORY.md or STATUS.md. The Slack report shows exactly what would have been sent for review.
+
 The script runs asynchronously — acknowledge the command immediately, then let the script post its own completion report.
 
 ---
