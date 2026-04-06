@@ -301,6 +301,7 @@ async function phase2SalesNavInbox(page, config) {
 }
 
 // ─── Phase 3: Follow-up to accepted connection ────────────────────────────────
+// Uses same verified selectors as follow-ups.js (live DOM probe 2026-04-06)
 async function phase3FollowUp(page, config) {
   setProgress(3, 'Navigating to connections page…');
   try {
@@ -311,73 +312,92 @@ async function phase3FollowUp(page, config) {
     setProgress(3, 'Scanning connections for 3+ day old contacts not yet followed up…');
 
     const alreadyFollowedUp = loadFollowedUpNames(config.nickname);
-
     let scrollAttempts = 0;
-    const seen = new Set();
+    let noNewCardsStreak = 0;
+    let lastCardCount = 0;
 
     while (scrollAttempts < 30) {
-      const cards = await page.locator('li.mn-connection-card').all();
+      // Find message links for connection cards (not the nav Messaging link)
+      const msgLinks = await page.locator('a[aria-label="Message"]').all();
+      const cardLinks = [];
+      for (const link of msgLinks) {
+        const href = await link.getAttribute('href').catch(() => '');
+        if (href && href.includes('/messaging/compose/')) cardLinks.push(link);
+      }
 
-      for (const card of cards) {
+      if (cardLinks.length === lastCardCount) {
+        noNewCardsStreak++;
+        if (noNewCardsStreak >= 3) break;
+      } else {
+        noNewCardsStreak = 0;
+        lastCardCount = cardLinks.length;
+      }
+
+      for (const msgLink of cardLinks) {
         try {
-          const nameEl = card.locator('.mn-connection-card__name, .t-16.t-black.t-bold').first();
-          const name = (await nameEl.textContent({ timeout: 1000 }).catch(() => '')).trim();
-          if (!name || seen.has(name) || alreadyFollowedUp.has(name.toLowerCase())) continue;
-          seen.add(name);
+          // Walk up DOM to find card root with name/date
+          const data = await msgLink.evaluate((el) => {
+            let node = el.parentElement;
+            for (let i = 0; i < 12; i++) {
+              if (!node) break;
+              if (node.hasAttribute('componentkey') && node.innerText.includes('Connected on')) {
+                const pTags = Array.from(node.querySelectorAll('p')).map(p => p.textContent.trim());
+                const connectedP = pTags.find(t => t.startsWith('Connected on')) || '';
+                return {
+                  name:         pTags[0] || '',
+                  occupation:   pTags[1] || '',
+                  connectedText: connectedP,
+                  msgHref:      el.getAttribute('href'),
+                };
+              }
+              node = node.parentElement;
+            }
+            return null;
+          });
 
-          const connectedEl = card.locator('.mn-connection-card__connected-date, time').first();
-          const connectedText = (await connectedEl.textContent({ timeout: 1000 }).catch(() => '')).trim();
-          if (!connectedText || !isOldEnough(connectedText)) continue;
+          if (!data || !data.name || !data.connectedText) continue;
+          if (!isOldEnough(data.connectedText)) continue;
+          if (alreadyFollowedUp.has(data.name.toLowerCase())) continue;
 
-          // Get occupation for context
-          const occupationEl = card.locator('.mn-connection-card__occupation, .t-14.t-black--light').first();
-          const occupation = (await occupationEl.textContent({ timeout: 1000 }).catch(() => '')).trim();
+          const lead = { name: data.name, title: data.occupation, company: '', location: '' };
+          const message = await generateFollowUp(config, lead).catch(() => null);
+          if (!message) continue;
 
-          // Navigate to their profile to get message button
-          const profileLink = card.locator('a[href*="/in/"]').first();
-          const href = await profileLink.getAttribute('href').catch(() => null);
-          if (!href) continue;
-
-          const profileUrl = href.startsWith('http') ? href : `https://www.linkedin.com${href}`;
-          await page.goto(profileUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+          // Navigate to compose URL
+          const composeUrl = data.msgHref.startsWith('http')
+            ? data.msgHref
+            : `https://www.linkedin.com${data.msgHref}`;
+          await page.goto(composeUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
           await sleep(randomBetween(3000, 4000));
 
-          // Get title + company from profile
-          const title   = (await page.locator('.pv-text-details__left-panel h2, .text-body-medium').first().textContent({ timeout: 2000 }).catch(() => occupation)).trim();
-          const company = (await page.locator('.pv-text-details__right-panel .t-14, .pv-entity__secondary-title').first().textContent({ timeout: 2000 }).catch(() => '')).trim();
+          const replyBox = page.locator('.msg-form__contenteditable[contenteditable="true"]').first();
+          if (!await replyBox.isVisible({ timeout: 6000 }).catch(() => false)) continue;
 
-          // Find Message button
-          const msgBtn = page.locator('a[href*="messaging"], button:has-text("Message")').first();
-          if (!await msgBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await page.goBack({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
-            await sleep(randomBetween(2000, 3000));
-            continue;
-          }
-
-          const lead = { name, title: title || occupation, company, location: '' };
-          const message = await generateFollowUp(lead, config);
-
-          await msgBtn.click();
-          await sleep(randomBetween(2000, 3000));
-
-          const msgEditor = page.locator('.msg-form__contenteditable[contenteditable="true"]').first();
-          if (!await msgEditor.isVisible({ timeout: 5000 }).catch(() => false)) continue;
-
-          await msgEditor.click();
-          await sleep(500);
+          await replyBox.click();
+          await sleep(400);
+          await page.keyboard.press('Control+a');
+          await page.keyboard.press('Delete');
+          await sleep(200);
           await page.keyboard.type(message, { delay: randomBetween(30, 60) });
+          await page.evaluate(() => {
+            const el = document.querySelector('.msg-form__contenteditable');
+            if (el) el.dispatchEvent(new Event('input', { bubbles: true }));
+          }).catch(() => null);
           await sleep(randomBetween(800, 1500));
 
-          const sendBtn = page.locator('button.msg-form__send-button').first();
-          if (await sendBtn.isEnabled({ timeout: 3000 }).catch(() => false)) {
-            await sendBtn.click();
-          } else {
-            await page.keyboard.press('Enter');
+          const sendBtn = page.locator('.msg-form__send-button').first();
+          let sendReady = false;
+          for (let attempt = 0; attempt < 10; attempt++) {
+            if (await sendBtn.isEnabled({ timeout: 500 }).catch(() => false)) { sendReady = true; break; }
+            await sleep(400);
           }
+          if (!sendReady) continue;
+
+          await sendBtn.click({ timeout: 5000 });
           await sleep(randomBetween(1500, 2000));
 
-          appendToHistory(config.nickname, `- Follow-up → ${name}`);
-          return sent({ name, title: lead.title, company: lead.company, messageSent: message });
+          appendToHistory(config.nickname, `- Follow-up → ${data.name}`);
+          return sent({ name: data.name, title: data.occupation, company: '', messageSent: message });
 
         } catch (cardErr) {
           console.log(`[test-run] Follow-up card error: ${cardErr.message.substring(0, 80)}`);
@@ -385,7 +405,7 @@ async function phase3FollowUp(page, config) {
         }
       }
 
-      // Scroll for more
+      // Scroll for more connections
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
       await sleep(randomBetween(1500, 2500));
       scrollAttempts++;

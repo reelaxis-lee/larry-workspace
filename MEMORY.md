@@ -188,11 +188,18 @@ Verified via live DOM probe 2026-04-06.
 | Send button | `button[data-sales-action]` (poll for enabled state after typing) |
 
 ### LinkedIn Connections Page (follow-ups)
-| Element | Selector |
-|---------|----------|
-| Connection cards | scroll + evaluate links |
-| Name (from aria-label) | Strip `"View "` prefix + `"'s profile"` suffix |
-| Message button | `[aria-label*="Message"]` (contains match — includes person's name) |
+Verified via live DOM probe 2026-04-06. LinkedIn switched to hashed CSS classes — no semantic class selectors work.
+| Element | Selector / Approach |
+|---------|---------------------|
+| Message links (connection cards) | `a[aria-label="Message"]` where `href.includes('/messaging/compose/')` — excludes nav link which has `aria-label="Messaging, X new notifications"` |
+| Card root | Walk up from Message link: first ancestor `div[componentkey]` whose `innerText` includes `"Connected on"` |
+| Person name | First `<p>` inside card root |
+| Occupation / title | Second `<p>` inside card root |
+| Connected date | `<p>` whose text starts with `"Connected on"` — e.g. `"Connected on April 5, 2026"` |
+| Profile URL | `a[href*="/in/"]` inside card root |
+| Compose URL | `href` from the Message link — `/messaging/compose/?profileUrn=...` — navigate directly, no profile visit needed |
+| Reply box | `.msg-form__contenteditable[contenteditable="true"]` (standard LinkedIn messaging overlay) |
+| Send button | `.msg-form__send-button` (poll for enabled after typing + input event dispatch) |
 
 ---
 
