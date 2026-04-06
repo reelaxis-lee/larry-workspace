@@ -35,10 +35,27 @@ async function runSalesNavConnections(page, config, results) {
 
     if (leads.length === 0) {
       consecutiveEmptyPages++;
-      console.log(`[${config.nickname}] No leads on page ${pageNum} — search exhausted (${consecutiveEmptyPages}/${EMPTY_PAGE_LIMIT} empty pages)`);
-      results.searchStatus = 'Exhausted';
-      await flagSearchExhausted(config, results);
-      break;
+      console.log(`[${config.nickname}] No leads on page ${pageNum} — 0 results (${consecutiveEmptyPages}/${EMPTY_PAGE_LIMIT} consecutive empty pages)`);
+      if (consecutiveEmptyPages >= EMPTY_PAGE_LIMIT) {
+        console.log(`[${config.nickname}] Search exhausted — ${EMPTY_PAGE_LIMIT} consecutive pages with no results`);
+        results.searchStatus = 'Exhausted';
+        await flagSearchExhausted(config, results);
+        break;
+      }
+      // Not yet at threshold — try next page before flagging
+      const nextBtn = page.locator('button[aria-label="Next"]').first();
+      const hasNext = await nextBtn.isVisible({ timeout: 3000 }).catch(() => false);
+      if (!hasNext) {
+        // No next page either — genuinely exhausted
+        console.log(`[${config.nickname}] No leads and no next page — search exhausted`);
+        results.searchStatus = 'Exhausted';
+        await flagSearchExhausted(config, results);
+        break;
+      }
+      await nextBtn.click({ force: true });
+      pageNum++;
+      await delays.afterPageLoad();
+      continue;
     }
 
     console.log(`[${config.nickname}] Page ${pageNum}: ${leads.length} leads`);
