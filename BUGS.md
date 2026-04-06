@@ -38,6 +38,7 @@ Updated after every session or fix. Use this file for any active bug, open quest
 |------------|-------------|----------|-------|
 | 2026-04-06 | Expired `ANTHROPIC_API_KEY` in `.env` — valid key was only in shell/openclaw.json env. `messenger.js` had `override: true` on dotenv which stomped the valid key with the stale one on every module load. All production sessions since search exhaustion (April 3–6) sent 0 messages so no malformed content was sent. | 2026-04-06 | Fixed: `.env` updated with valid key; `override: true` removed from messenger.js |
 | 2026-04-06 | `classifyInboxMessage` and `generateInboxReply` called with reversed arg order in `test-run.js` phases 1 & 2 — caused `.map` crash on every inbox thread. | 2026-04-06 | Fixed: corrected to `(config, { contactName, messages, lastMessage })` |
+| 2026-03-13 | `inbox.js` only checked `linkedin.com/messaging` — Sales Navigator inbox (`linkedin.com/sales/inbox`) was never checked. InMail replies from prospects in Sales Nav were silently ignored on every session run. | 2026-04-06 | Fixed: added `runSalesNavInboxCheck()` as Pass 2 in `inbox.js` using DOM-verified selectors from live probe of Darren's Sales Nav inbox |
 
 ---
 
