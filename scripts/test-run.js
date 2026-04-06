@@ -130,6 +130,24 @@ function skipped(reason)           { return { status: 'Skipped', reason, name: '
 function sent(data)                { return { status: 'Sent', reason: '', ...data }; }
 function errored(reason)           { return { status: 'Error', reason, name: '—', title: '', company: '', messageSent: '' }; }
 
+// ─── Safety guardrail — never send internal reasoning text ───────────────────
+// If Claude outputs meta-reasoning instead of a reply (e.g. because it detected
+// the conversation context was malformed), abort the send and log a warning.
+const INTERNAL_REASONING_PATTERNS = [
+  /it looks like.*last message/i,
+  /the latest message shown/i,
+  /there['']s no reply from/i,
+  /could you share what .{1,30} (wrote|said|sent)/i,
+  /I can['']t see a (reply|response) from/i,
+  /it appears (that )?(you|darren) sent the last/i,
+  /I don['']t have enough context/i,
+  /could you provide (more|the actual)/i,
+];
+
+function looksLikeInternalReasoning(text) {
+  return INTERNAL_REASONING_PATTERNS.some(p => p.test(text));
+}
+
 // ─── Phase 1: LinkedIn inbox reply ───────────────────────────────────────────
 async function phase1LinkedInInbox(page, config) {
   setProgress(1, 'Navigating to LinkedIn messaging…');
@@ -155,19 +173,22 @@ async function phase1LinkedInInbox(page, config) {
         await item.click();
         await sleep(randomBetween(2000, 3000));
 
-        // Read last 8 messages
+        // Read last 8 message groups
+        // isMine detection: .msg-s-message-group__profile-link contains sender name.
+        // .msg-s-message-group--outgoing is DEAD (LinkedIn hashed-class UI update 2026-04).
         const msgEls = await page.locator('.msg-s-message-list__event').all();
         const lastMsgs = msgEls.slice(-8);
         const conversation = [];
         for (const el of lastMsgs) {
-          const text  = (await el.locator('.msg-s-event-listitem__body').textContent({ timeout: 1000 }).catch(() => '')).trim();
-          const isMine = await el.locator('.msg-s-message-group--outgoing').count().then(c => c > 0).catch(() => false);
+          const text = (await el.locator('.msg-s-event-listitem__body').first().textContent({ timeout: 1000 }).catch(() => '')).trim();
+          const senderName = (await el.locator('.msg-s-message-group__profile-link').first().textContent({ timeout: 500 }).catch(() => '')).trim();
+          const isMine = !senderName || senderName === config.name;
           if (text) conversation.push({ sender: isMine ? 'me' : 'them', text });
         }
 
         if (!conversation.length) continue;
 
-        // Must end with "them"
+        // Skip if we sent the last message — check BEFORE any Claude call
         const last = conversation[conversation.length - 1];
         if (last.sender !== 'them') continue;
 
@@ -178,6 +199,12 @@ async function phase1LinkedInInbox(page, config) {
 
         // Generate reply
         const reply = await generateInboxReply(config, { contactName: name, messages, lastMessage: last.text, intent: classification.intent });
+
+        // Safety guardrail: never send internal reasoning text to a real person
+        if (!reply || looksLikeInternalReasoning(reply)) {
+          console.log(`[test-run] LinkedIn inbox — guardrail blocked send to ${name}: reply looks like internal reasoning`);
+          continue;
+        }
 
         // Send reply
         const editor = page.locator('.msg-form__contenteditable[contenteditable="true"]').first();
@@ -264,6 +291,12 @@ async function phase2SalesNavInbox(page, config) {
         if (!['positive', 'neutral'].includes(classification.intent)) continue;
 
         const reply = await generateInboxReply(config, { contactName: name, messages, lastMessage: last.text, intent: classification.intent });
+
+        // Safety guardrail: never send internal reasoning text to a real person
+        if (!reply || looksLikeInternalReasoning(reply)) {
+          console.log(`[test-run] Sales Nav inbox — guardrail blocked send to ${name}: reply looks like internal reasoning`);
+          continue;
+        }
 
         // Verified compose selector: textarea[placeholder="Type your message here…"]
         // Send button: button[data-sales-action] (disabled until text typed)

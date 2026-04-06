@@ -18,6 +18,19 @@
  */
 
 const { delays, sleep, randomBetween } = require('../utils/browser');
+
+// Safety guardrail — patterns that indicate Claude output internal reasoning
+// instead of a reply. If any match, abort the send immediately.
+const REASONING_PATTERNS = [
+  /it looks like.*last message/i,
+  /the latest message shown/i,
+  /there['']s no reply from/i,
+  /could you share what .{1,30} (wrote|said|sent)/i,
+  /I can['']t see a (reply|response) from/i,
+  /it appears (that )?(you|the sender) sent the last/i,
+  /I don['']t have enough context/i,
+  /could you provide (more|the actual)/i,
+];
 const { classifyInboxMessage, generateInboxReply } = require('../utils/messenger');
 const { alertError } = require('../utils/report');
 const fs = require('fs');
@@ -190,6 +203,13 @@ async function runInboxCheck(page, config, results) {
 
       if (!reply) {
         console.log(`[${config.nickname}] ${thread.name} — reply generation failed`);
+        continue;
+      }
+
+      // Safety guardrail: never send internal reasoning text to a real person.
+      // REASONING_PATTERNS defined at module top level.
+      if (REASONING_PATTERNS.some(p => p.test(reply))) {
+        console.log(`[${config.nickname}] ${thread.name} — GUARDRAIL: reply looks like internal reasoning, skipping send`);
         continue;
       }
 
@@ -367,6 +387,12 @@ async function runSalesNavInboxCheck(page, config, results, alreadyReplied, repl
 
       if (!reply) {
         console.log(`[${config.nickname}] [SalesNav] ${name} — reply generation failed`);
+        continue;
+      }
+
+      // Safety guardrail: never send internal reasoning text to a real person
+      if (REASONING_PATTERNS.some(p => p.test(reply))) {
+        console.log(`[${config.nickname}] [SalesNav] ${name} — GUARDRAIL: reply looks like internal reasoning, skipping send`);
         continue;
       }
 
