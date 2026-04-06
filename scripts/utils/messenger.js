@@ -60,7 +60,7 @@ BANNED PHRASES: ${accountConfig.bannedPhrases || 'synergy, leverage, circle back
 Write ONLY the message text. Nothing else. No quotes, no explanation.`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-opus-4-5',
+    model: 'claude-sonnet-4-6',
     max_tokens: 150,
     messages: [{ role: 'user', content: prompt }],
   });
@@ -110,7 +110,7 @@ RULES:
 Write ONLY the message text. Nothing else.`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-opus-4-5',
+    model: 'claude-sonnet-4-6',
     max_tokens: 200,
     messages: [{ role: 'user', content: prompt }],
   });
@@ -155,7 +155,7 @@ SUBJECT: [subject line]
 BODY: [message body]`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-opus-4-5',
+    model: 'claude-sonnet-4-6',
     max_tokens: 300,
     messages: [{ role: 'user', content: prompt }],
   });
@@ -199,7 +199,7 @@ RULES:
 Write ONLY the comment text. Nothing else.`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-opus-4-5',
+    model: 'claude-sonnet-4-6',
     max_tokens: 100,
     messages: [{ role: 'user', content: prompt }],
   });
@@ -235,7 +235,7 @@ Return ONLY a JSON object like this, nothing else:
 {"intent": "positive", "reason": "They asked to schedule a demo"}`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-opus-4-5',
+    model: 'claude-sonnet-4-6',
     max_tokens: 80,
     messages: [{ role: 'user', content: prompt }],
   });
@@ -288,7 +288,7 @@ RULES:
 Write ONLY the reply text. Nothing else.`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-opus-4-5',
+    model: 'claude-sonnet-4-6',
     max_tokens: 200,
     messages: [{ role: 'user', content: prompt }],
   });
