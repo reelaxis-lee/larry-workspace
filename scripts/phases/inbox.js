@@ -1,15 +1,20 @@
 /**
  * inbox.js — Read LinkedIn inbox and respond to positive/interested messages
  *
- * Flow per session:
- *   1. Open LinkedIn messaging — get thread URLs from the list
- *   2. Navigate to each thread directly (ensures full page load + all messages)
- *   3. Scroll to bottom, read last 8 messages
- *   4. Classify intent via Claude: positive / neutral / negative / skip
- *   5. positive/neutral → generate + send reply, flag hot leads to Slack
- *   6. negative → log, do not reply
+ * Pass 1 — Standard LinkedIn messaging (linkedin.com/messaging)
+ *   Selectors: .msg-conversation-listitem, .msg-s-event-listitem, .msg-form__contenteditable
  *
- * Limits: max 10 threads read, max 8 replies sent per session
+ * Pass 2 — Sales Navigator inbox (linkedin.com/sales/inbox)
+ *   Verified selectors (live DOM probe 2026-04-06):
+ *   - Thread list:   .conversation-list-item
+ *   - Contact name:  span[data-anonymize="person-name"] (in list item)
+ *   - Message body:  p[data-anonymize="general-blurb"] (in article)
+ *   - Incoming msg:  article has span[data-anonymize="person-name"] with sender name
+ *   - Outgoing msg:  article does NOT have span[data-anonymize="person-name"]
+ *   - Reply box:     textarea[placeholder="Type your message here…"]
+ *   - Send button:   button[data-sales-action] (disabled until text typed)
+ *
+ * Limits: max 10 threads per pass, max 8 replies total across both passes
  */
 
 const { delays, sleep, randomBetween } = require('../utils/browser');
@@ -246,7 +251,7 @@ async function runInboxCheck(page, config, results) {
       await delays.betweenMessages();
     }
 
-    console.log(`[${config.nickname}] Inbox done — read: ${threadsRead}, replied: ${repliesSent}, hot leads: ${hotLeads.length}`);
+    console.log(`[${config.nickname}] LinkedIn inbox done — read: ${threadsRead}, replied: ${repliesSent}`);
 
     if (hotLeads.length > 0) {
       results.flags.push(`🔥 ${hotLeads.length} hot lead(s): ${hotLeads.map(l => l.name).join(', ')}`);
@@ -257,8 +262,167 @@ async function runInboxCheck(page, config, results) {
 
   } catch (err) {
     console.log(`[${config.nickname}] Inbox error: ${err.message.substring(0, 100)}`);
-    await alertError(config, 'inbox', 'reading/responding to inbox', err.message.substring(0, 200), 'phase aborted');
+    await alertError(config, 'inbox', 'reading/responding to inbox', err.message.substring(0, 200), 'LinkedIn inbox pass aborted');
   }
+
+  // ── Pass 2: Sales Navigator inbox ─────────────────────────────
+  if (repliesSent < MAX_REPLIES) {
+    try {
+      await runSalesNavInboxCheck(page, config, results, alreadyReplied, repliesSent, MAX_REPLIES);
+    } catch (err) {
+      console.log(`[${config.nickname}] Sales Nav inbox error: ${err.message.substring(0, 100)}`);
+      await alertError(config, 'inbox', 'reading/responding to Sales Nav inbox', err.message.substring(0, 200), 'Sales Nav inbox pass aborted');
+    }
+  }
+}
+
+// ── Pass 2: Sales Navigator inbox ──────────────────────────────────────────
+// Verified selectors — live DOM probe 2026-04-06
+async function runSalesNavInboxCheck(page, config, results, alreadyReplied, repliesSentSoFar, maxReplies) {
+  console.log(`[${config.nickname}] Sales Nav inbox check — reading threads`);
+
+  await page.goto('https://www.linkedin.com/sales/inbox', {
+    waitUntil: 'domcontentloaded', timeout: 30000,
+  });
+  await sleep(randomBetween(4000, 6000));
+
+  const threadCount = await page.locator('.conversation-list-item').count().catch(() => 0);
+  if (!threadCount) {
+    console.log(`[${config.nickname}] Sales Nav inbox — no threads found`);
+    return;
+  }
+
+  let repliesSent = repliesSentSoFar;
+  let threadsRead = 0;
+
+  for (let i = 0; i < Math.min(threadCount, 10); i++) {
+    if (repliesSent >= maxReplies) break;
+
+    try {
+      const thread = page.locator('.conversation-list-item').nth(i);
+
+      // Get contact name before clicking
+      const nameEl = thread.locator('span[data-anonymize="person-name"]').first();
+      const name = (await nameEl.textContent({ timeout: 2000 }).catch(() => '')).trim();
+      if (!name) continue;
+
+      const nameKey = name.toLowerCase();
+      if (alreadyReplied.has(nameKey)) {
+        console.log(`[${config.nickname}] [SalesNav] ${name} — already replied, skipping`);
+        continue;
+      }
+
+      await thread.click();
+      await sleep(randomBetween(2000, 3000));
+      threadsRead++;
+
+      // Read messages from thread — each <article> is one message bubble
+      // Incoming: article has span[data-anonymize="person-name"]
+      // Outgoing: article does NOT have that span
+      const articles = await page.locator('.thread-container article').all();
+      if (!articles.length) continue;
+
+      const conversation = [];
+      for (const article of articles) {
+        const senderSpan = article.locator('span[data-anonymize="person-name"]').first();
+        const isMine = !(await senderSpan.isVisible({ timeout: 500 }).catch(() => false));
+        const textEl = article.locator('p[data-anonymize="general-blurb"]').first();
+        const text = (await textEl.textContent({ timeout: 1000 }).catch(() => '')).trim();
+        if (text) conversation.push({ sender: isMine ? 'me' : 'them', text });
+      }
+
+      if (!conversation.length) continue;
+      const lastMsg = conversation[conversation.length - 1];
+      if (lastMsg.sender !== 'them') {
+        console.log(`[${config.nickname}] [SalesNav] ${name} — we sent last, skipping`);
+        continue;
+      }
+
+      console.log(`[${config.nickname}] [SalesNav] ${name} — ${conversation.length} msgs, last from them`);
+
+      // Classify intent
+      const messages = conversation.map(m => ({ sender: m.sender === 'me' ? config.name : name, text: m.text }));
+      const classification = await classifyInboxMessage(config, {
+        contactName: name,
+        messages,
+        lastMessage: lastMsg.text,
+      }).catch(() => ({ intent: 'skip', reason: 'classification failed' }));
+
+      console.log(`[${config.nickname}] [SalesNav] ${name} — intent: ${classification.intent}`);
+
+      if (classification.intent === 'negative') {
+        results.flags = results.flags || [];
+        results.flags.push(`[SalesNav] ${name} replied negatively — review inbox`);
+        continue;
+      }
+      if (classification.intent === 'skip') continue;
+
+      // Generate reply
+      const reply = await generateInboxReply(config, {
+        contactName: name,
+        messages,
+        lastMessage: lastMsg.text,
+        intent: classification.intent,
+      }).catch(() => null);
+
+      if (!reply) {
+        console.log(`[${config.nickname}] [SalesNav] ${name} — reply generation failed`);
+        continue;
+      }
+
+      // Send via verified compose selector
+      const textarea = page.locator('textarea[placeholder="Type your message here…"]').first();
+      if (!await textarea.isVisible({ timeout: 4000 }).catch(() => false)) {
+        console.log(`[${config.nickname}] [SalesNav] ${name} — compose area not visible`);
+        continue;
+      }
+
+      await textarea.click();
+      await sleep(500);
+      await textarea.type(reply, { delay: randomBetween(30, 60) });
+      await sleep(randomBetween(800, 1500));
+
+      // Wait for send button to enable
+      const sendBtn = page.locator('button[data-sales-action]').first();
+      let sendReady = false;
+      for (let attempt = 0; attempt < 10; attempt++) {
+        if (await sendBtn.isEnabled({ timeout: 500 }).catch(() => false)) { sendReady = true; break; }
+        await sleep(500);
+      }
+
+      if (!sendReady) {
+        console.log(`[${config.nickname}] [SalesNav] ${name} — send button never enabled`);
+        continue;
+      }
+
+      await sendBtn.click();
+      await sleep(randomBetween(1500, 2500));
+
+      repliesSent++;
+      alreadyReplied.add(nameKey);
+      results.messagessent = (results.messagessent || 0) + 1;
+      results.inboxRepliesLog = results.inboxRepliesLog || [];
+      results.inboxRepliesLog.push(name);
+
+      if (classification.intent === 'positive') {
+        results.positiveReplies = (results.positiveReplies || []);
+        results.positiveReplies.push(name);
+        results.flags = results.flags || [];
+        results.flags.push(`🔥 [SalesNav] Hot lead replied: ${name}`);
+        console.log(`[${config.nickname}] 🔥 [SalesNav] Hot lead replied: ${name}`);
+      } else {
+        console.log(`[${config.nickname}] ✅ [SalesNav] Replied to ${name} (${repliesSent}/${maxReplies})`);
+      }
+
+      await delays.betweenMessages();
+
+    } catch (threadErr) {
+      console.log(`[${config.nickname}] [SalesNav] thread error: ${threadErr.message.substring(0, 80)}`);
+      continue;
+    }
+  }
+
+  console.log(`[${config.nickname}] Sales Nav inbox done — read: ${threadsRead}, replied: ${repliesSent - repliesSentSoFar}`);
 }
 
 module.exports = { runInboxCheck };

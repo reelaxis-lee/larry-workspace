@@ -174,6 +174,19 @@ Must include `## Log` header or `logToHistory()` silently fails and `hasRunToday
 | Reply box | `.msg-form__contenteditable` |
 | Send button | `.msg-form__send-button` (disabled until content typed) |
 
+### Sales Navigator Inbox (inbox phase — pass 2)
+Verified via live DOM probe 2026-04-06.
+| Element | Selector |
+|---------|----------|
+| Thread list items | `.conversation-list-item` |
+| Contact name in list | `span[data-anonymize="person-name"]` (inside list item) |
+| Message articles in thread | `.thread-container article` |
+| Incoming msg indicator | `article` has `span[data-anonymize="person-name"]` visible |
+| Outgoing msg indicator | `article` does NOT have `span[data-anonymize="person-name"]` |
+| Message body text | `p[data-anonymize="general-blurb"]` |
+| Reply textarea | `textarea[placeholder="Type your message here…"]` |
+| Send button | `button[data-sales-action]` (poll for enabled state after typing) |
+
 ### LinkedIn Connections Page (follow-ups)
 | Element | Selector |
 |---------|----------|
