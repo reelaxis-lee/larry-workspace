@@ -172,12 +172,12 @@ async function phase1LinkedInInbox(page, config) {
         if (last.sender !== 'them') continue;
 
         // Classify
-        const convoText = conversation.map(m => `${m.sender === 'me' ? 'Me' : name}: ${m.text}`).join('\n');
-        const classification = await classifyInboxMessage(convoText, config);
+        const messages = conversation.map(m => ({ sender: m.sender === 'me' ? 'Me' : name, text: m.text }));
+        const classification = await classifyInboxMessage(config, { contactName: name, messages, lastMessage: last.text });
         if (!['positive', 'neutral'].includes(classification.intent)) continue;
 
         // Generate reply
-        const reply = await generateInboxReply({ name, lastMessage: last.text, fullConversation: convoText, intent: classification.intent }, config);
+        const reply = await generateInboxReply(config, { contactName: name, messages, lastMessage: last.text, intent: classification.intent });
 
         // Send reply
         const editor = page.locator('.msg-form__contenteditable[contenteditable="true"]').first();
@@ -253,11 +253,11 @@ async function phase2SalesNavInbox(page, config) {
         const last = conversation[conversation.length - 1];
         if (last.sender !== 'them') continue;
 
-        const convoText = conversation.map(m => `${m.sender === 'me' ? 'Me' : name}: ${m.text}`).join('\n');
-        const classification = await classifyInboxMessage(convoText, config);
+        const messages = conversation.map(m => ({ sender: m.sender === 'me' ? 'Me' : name, text: m.text }));
+        const classification = await classifyInboxMessage(config, { contactName: name, messages, lastMessage: last.text });
         if (!['positive', 'neutral'].includes(classification.intent)) continue;
 
-        const reply = await generateInboxReply({ name, lastMessage: last.text, fullConversation: convoText, intent: classification.intent }, config);
+        const reply = await generateInboxReply(config, { contactName: name, messages, lastMessage: last.text, intent: classification.intent });
 
         // Sales Nav reply editor
         const editor = page.locator('.msg-form__contenteditable[contenteditable="true"], [data-view-name="conversation-reply-editor"] [contenteditable]').first();

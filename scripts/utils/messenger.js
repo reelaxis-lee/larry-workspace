@@ -3,7 +3,7 @@
  * Used for connection requests, follow-ups, InMails, and post comments.
  */
 
-require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env'), override: true });
+require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 const Anthropic = require('@anthropic-ai/sdk');
 const fs = require('fs');
 const path = require('path');
