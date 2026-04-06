@@ -132,10 +132,11 @@ function errored(reason)           { return { status: 'Error', reason, name: '�
 
 // ─── Phase 1: LinkedIn inbox reply ───────────────────────────────────────────
 async function phase1LinkedInInbox(page, config) {
-  console.log(`[test-run][${config.nickname}] Phase 1: LinkedIn inbox`);
+  setProgress(1, 'Navigating to LinkedIn messaging…');
   try {
     await page.goto('https://www.linkedin.com/messaging/', { waitUntil: 'domcontentloaded', timeout: 20000 });
     await sleep(randomBetween(3000, 4000));
+    setProgress(1, 'Reading inbox threads…');
 
     const items = page.locator('.msg-conversation-listitem');
     const itemCount = await items.count().catch(() => 0);
@@ -215,10 +216,11 @@ async function phase1LinkedInInbox(page, config) {
 
 // ─── Phase 2: Sales Nav inbox reply ──────────────────────────────────────────
 async function phase2SalesNavInbox(page, config) {
-  console.log(`[test-run][${config.nickname}] Phase 2: Sales Nav inbox`);
+  setProgress(2, 'Navigating to Sales Nav inbox…');
   try {
     await page.goto('https://www.linkedin.com/sales/inbox', { waitUntil: 'domcontentloaded', timeout: 30000 });
     await sleep(randomBetween(4000, 6000));
+    setProgress(2, 'Reading Sales Nav inbox threads…');
 
     // Sales Nav inbox conversation list
     const threads = await page.locator('[data-view-name="sales-inbox-conversation-list-item"], .conversations-list__conversation').all();
@@ -290,12 +292,13 @@ async function phase2SalesNavInbox(page, config) {
 
 // ─── Phase 3: Follow-up to accepted connection ────────────────────────────────
 async function phase3FollowUp(page, config) {
-  console.log(`[test-run][${config.nickname}] Phase 3: Follow-ups`);
+  setProgress(3, 'Navigating to connections page…');
   try {
     await page.goto('https://www.linkedin.com/mynetwork/invite-connect/connections/', {
       waitUntil: 'domcontentloaded', timeout: 30000,
     });
     await sleep(6000);
+    setProgress(3, 'Scanning connections for 3+ day old contacts not yet followed up…');
 
     const alreadyFollowedUp = loadFollowedUpNames(config.nickname);
 
@@ -399,12 +402,13 @@ function isOldEnough(connectedText) {
 
 // ─── Phase 4: InMail to Open Profile ─────────────────────────────────────────
 async function phase4InMail(page, config) {
-  console.log(`[test-run][${config.nickname}] Phase 4: InMail`);
+  setProgress(4, 'Navigating to Sales Nav saved search…');
   try {
     if (!config.salesNavSearchUrl) return skipped('No Sales Nav search URL configured');
 
     await page.goto(config.salesNavSearchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await sleep(randomBetween(7000, 10000));
+    setProgress(4, 'Scanning leads for Open Profile InMail candidates…');
 
     // Dismiss teaching bubbles
     const dismissBtns = await page.locator('[data-test-enterprise-teaching-bubble-dismiss-btn]').all();
@@ -488,13 +492,13 @@ async function phase4InMail(page, config) {
 
 // ─── Phase 5: Connection request ─────────────────────────────────────────────
 async function phase5Connect(page, config) {
-  console.log(`[test-run][${config.nickname}] Phase 5: Connection request`);
+  setProgress(5, 'Navigating to Sales Nav saved search…');
   try {
     if (!config.salesNavSearchUrl) return skipped('No Sales Nav search URL configured');
 
-    // Search page may already be loaded from phase 4 — navigate anyway to reset state
     await page.goto(config.salesNavSearchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await sleep(randomBetween(7000, 10000));
+    setProgress(5, 'Scanning leads for eligible 2nd degree connection requests…');
 
     const dismissBtns = await page.locator('[data-test-enterprise-teaching-bubble-dismiss-btn]').all();
     for (const b of dismissBtns) await b.click().catch(() => {});
@@ -624,6 +628,41 @@ function formatReport(nickname, results, startTime) {
   return `*TEST RUN COMPLETE — ${nickname} — ${ts}*\n\n${lines.join('\n\n')}\n\n*Total sent: ${totalSent}/5*`;
 }
 
+// ─── Progress state (updated by each phase, read by heartbeat) ───────────────
+const progress = {
+  phase: 0,
+  phaseLabel: 'Starting…',
+  status: 'Launching Chrome and verifying LinkedIn session…',
+};
+
+const PHASE_LABELS = [
+  '',
+  'Phase 1 — LinkedIn inbox reply',
+  'Phase 2 — Sales Nav inbox reply',
+  'Phase 3 — Follow-up message',
+  'Phase 4 — InMail',
+  'Phase 5 — Connection request',
+];
+
+function setProgress(phase, status) {
+  progress.phase = phase;
+  progress.phaseLabel = PHASE_LABELS[phase] || `Phase ${phase}`;
+  progress.status = status;
+  console.log(`[test-run] [${PHASE_LABELS[phase] || phase}] ${status}`);
+}
+
+function startHeartbeat(startTime, channel) {
+  const interval = setInterval(async () => {
+    const elapsed = Math.round((Date.now() - startTime) / 1000);
+    const mins = Math.floor(elapsed / 60);
+    const secs = elapsed % 60;
+    const elapsedStr = `${mins}:${String(secs).padStart(2, '0')}`;
+    const msg = `⏱ *Test run update — ${nickname} (${elapsedStr} elapsed)*\nCurrently on: ${progress.phaseLabel}\nStatus: ${progress.status}`;
+    await postSlack(msg, channel).catch(() => {});
+  }, 60 * 1000);
+  return interval;
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 async function runTestSession() {
   if (!fs.existsSync(LOGS_DIR)) fs.mkdirSync(LOGS_DIR, { recursive: true });
@@ -662,6 +701,9 @@ async function runTestSession() {
     console.log(`[test-run] Starting test session for: ${nickname} (${config.name})`);
     await postSlack(`🧪 *Test run starting for ${nickname}…* (5 phases — will report back when complete)`);
 
+    // Start 60s heartbeat
+    const heartbeat = startHeartbeat(startTime, replyChannel);
+
     // Launch Chrome
     const context = await launchProfile(config);
     const page = context.pages()[0] || await context.newPage();
@@ -675,6 +717,7 @@ async function runTestSession() {
     const phase4 = await phase4InMail(page, config).catch(e => errored(e.message.substring(0, 100)));
     const phase5 = await phase5Connect(page, config).catch(e => errored(e.message.substring(0, 100)));
 
+    clearInterval(heartbeat);
     await context.close();
 
     const report = formatReport(nickname, [phase1, phase2, phase3, phase4, phase5], startTime);
@@ -682,6 +725,7 @@ async function runTestSession() {
     console.log(`[test-run] Complete.`);
 
   } catch (err) {
+    if (typeof heartbeat !== 'undefined') clearInterval(heartbeat);
     console.error(`[test-run] Fatal error:`, err.message);
     await postSlack(`❌ *Test run failed for ${nickname}*\nError: ${err.message.substring(0, 200)}`);
   } finally {
