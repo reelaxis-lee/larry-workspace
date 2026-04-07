@@ -88,13 +88,20 @@ Write ONLY the message text. Nothing else. No quotes, no explanation.`;
  * Generate a follow-up message after connection accepted.
  */
 async function generateFollowUp(accountConfig, leadProfile) {
-  const prompt = `You are writing a LinkedIn follow-up message for ${accountConfig.name}, sent after a connection request was accepted.
+  const leadFirstName = leadProfile.name ? leadProfile.name.split(' ')[0] : leadProfile.name;
+  const prompt = `You are writing a LinkedIn follow-up message. This message is written BY ${accountConfig.name} TO ${leadFirstName}.
+
+SENDER (writing the message): ${accountConfig.name}
+RECIPIENT (receiving the message): ${leadProfile.name}
+
+Never address ${accountConfig.name} by name — they are the sender, not the recipient.
+If the message opens with a name, it must be ${leadFirstName}'s name, not ${accountConfig.name}'s.
 
 === GLOBAL RULES (override everything else) ===
 ${GLOBAL_RULES}
 === END GLOBAL RULES ===
 
-ABOUT ${accountConfig.name.toUpperCase()}:
+ABOUT THE SENDER (${accountConfig.name}):
 ${accountConfig.offerDescription}
 
 VOICE & TONE:
@@ -103,7 +110,7 @@ ${accountConfig.voiceTone}
 FOLLOW-UP GUIDANCE:
 ${accountConfig.followUpGuidance}
 
-LEAD PROFILE:
+RECIPIENT PROFILE:
 Name: ${leadProfile.name}
 Title: ${leadProfile.title}
 Company: ${leadProfile.company}
@@ -130,13 +137,20 @@ Write ONLY the message text. Nothing else.`;
  * Generate an InMail message (subject + body).
  */
 async function generateInMail(accountConfig, leadProfile) {
-  const prompt = `You are writing a LinkedIn InMail for ${accountConfig.name}.
+  const leadFirstName = leadProfile.name ? leadProfile.name.split(' ')[0] : leadProfile.name;
+  const prompt = `You are writing a LinkedIn InMail. This message is written BY ${accountConfig.name} TO ${leadFirstName}.
+
+SENDER (writing the message): ${accountConfig.name}
+RECIPIENT (receiving the message): ${leadProfile.name}
+
+Never address ${accountConfig.name} by name — they are the sender, not the recipient.
+If the message opens with a name, it must be ${leadFirstName}'s name, not ${accountConfig.name}'s.
 
 === GLOBAL RULES (override everything else) ===
 ${GLOBAL_RULES}
 === END GLOBAL RULES ===
 
-ABOUT ${accountConfig.name.toUpperCase()}:
+ABOUT THE SENDER (${accountConfig.name}):
 ${accountConfig.offerDescription}
 
 VOICE & TONE:
@@ -145,7 +159,7 @@ ${accountConfig.voiceTone}
 INMAIL GUIDANCE:
 ${accountConfig.inMailGuidance}
 
-LEAD PROFILE:
+RECIPIENT PROFILE:
 Name: ${leadProfile.name}
 Title: ${leadProfile.title}
 Company: ${leadProfile.company}
