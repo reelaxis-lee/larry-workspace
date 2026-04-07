@@ -202,9 +202,16 @@ async function generateMessageTemplates(intake) {
   const avoid = Array.isArray(intake.avoid) ? intake.avoid.join(', ') : intake.avoid || '';
   const titles = (intake.icp?.titles || []).slice(0, 5).join(', ');
 
-  const prompt = `You are writing LinkedIn outreach message templates for a professional named ${firstName}.
+  const prompt = `You are writing LinkedIn outreach message templates.
 
-Here is their campaign info:
+SENDER (the person sending these messages): ${firstName}
+RECIPIENT (the person receiving these messages): referred to as [First Name] in templates
+
+CRITICAL: Never use ${firstName}'s name as a salutation or opener. ${firstName} is the SENDER.
+If a template opens with a name, it must be [First Name] — the recipient's name placeholder.
+Do NOT write "Hi ${firstName}" or "${firstName} here" anywhere in any template.
+
+Here is the sender's campaign info:
 - Offer: ${intake.offer}
 - Unique angle: ${intake.angle || 'N/A'}
 - Tone: ${intake.tone}
@@ -227,7 +234,7 @@ Write THREE message templates:
 3. INMAIL MESSAGE (for Open Profiles — subject line + body under 120 words)
 
 Rules:
-- Each template uses [First Name] as placeholder
+- Use [First Name] as the placeholder for the RECIPIENT's name (never ${firstName})
 - Match the tone exactly — if casual, be casual. If direct, be direct.
 - No filler openers ("Hope you're well", "I wanted to reach out", etc.)
 - The connection request must be under 300 characters — count the characters
@@ -270,12 +277,22 @@ INMAIL_BODY:
       return match ? match[1].trim() : '';
     };
 
-    return {
+    const templates = {
       connectionRequest: extract('CONNECTION_REQUEST'),
       followupMessage: extract('FOLLOWUP_MESSAGE'),
       inmailSubject: extract('INMAIL_SUBJECT'),
       inmailBody: extract('INMAIL_BODY'),
     };
+
+    // Sanity check: warn if any template opens with the sender's own name (salutation bug)
+    const senderNamePattern = new RegExp(`^(hi |hey |dear )?${firstName}[,\\s—\\-]`, 'i');
+    for (const [key, val] of Object.entries(templates)) {
+      if (val && senderNamePattern.test(val.trim())) {
+        console.warn(`[webhook] ⚠️ Template "${key}" opens with sender name "${firstName}" — check before use`);
+      }
+    }
+
+    return templates;
   } catch (err) {
     console.error('[webhook] Template generation failed:', err.message);
     return null;

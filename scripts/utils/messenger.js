@@ -196,7 +196,9 @@ BODY: [message body]`;
  * Generate a post comment.
  */
 async function generatePostComment(accountConfig, postContent, postAuthor) {
-  const prompt = `You are writing a LinkedIn comment for ${accountConfig.name}.
+  const prompt = `You are writing a LinkedIn comment. The commenter is ${accountConfig.name}.
+
+Do NOT start the comment with ${accountConfig.name}'s name (e.g. "As ${accountConfig.name.split(' ')[0]}..." or "${accountConfig.name.split(' ')[0]} here..."). The commenter's name appears automatically below the comment.
 
 === GLOBAL RULES (override everything else) ===
 ${GLOBAL_RULES}
@@ -279,13 +281,18 @@ async function generateInboxReply(accountConfig, { contactName, messages, lastMe
     ? 'They are interested. Move toward booking a call or next step. Keep it warm and not pushy.'
     : 'They asked a question or gave a neutral response. Answer naturally and keep the conversation going. Do not pitch hard.';
 
-  const prompt = `You are writing a LinkedIn reply for ${accountConfig.name}.
+  const prompt = `You are writing a LinkedIn reply. This reply is written BY ${accountConfig.name} TO ${contactName}.
+
+SENDER (writing the reply): ${accountConfig.name}
+RECIPIENT (who sent the last message): ${contactName}
+
+Never address ${accountConfig.name} by name — they are the sender. Do not open with ${accountConfig.name.split(' ')[0]}'s name or sign off with it.
 
 === GLOBAL RULES (override everything else) ===
 ${GLOBAL_RULES}
 === END GLOBAL RULES ===
 
-ABOUT ${accountConfig.name.toUpperCase()}:
+ABOUT THE SENDER (${accountConfig.name}):
 ${accountConfig.offerDescription}
 
 VOICE & TONE:
