@@ -70,8 +70,9 @@ async function runInMails(page, config, results) {
         return;
       }
 
+      let name = '';
       try {
-        const name = (await lead.locator('[data-anonymize="person-name"]').first()
+        name = (await lead.locator('[data-anonymize="person-name"]').first()
           .textContent({ timeout: 2000 }).catch(() => '')).trim();
         const title = (await lead.locator('[data-anonymize="title"]').first()
           .textContent({ timeout: 2000 }).catch(() => '')).trim();
