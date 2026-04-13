@@ -195,7 +195,12 @@ async function runFollowUps(page, config, results) {
           continue;
         }
 
-        // Navigate to compose URL (opens messaging overlay)
+        // Log to HISTORY.md BEFORE sending — prevents double-sends if session crashes mid-send.
+        // Worst case: send fails after logging = one missed message. Much better than duplicate sends.
+        appendFollowUpToHistory(config.nickname, card.name);
+        alreadyFollowedUp.add(card.name.toLowerCase());
+
+        // Navigate to compose URL (opens messaging overlay or existing thread reply box)
         const composeUrl = card.msgHref.startsWith('http')
           ? card.msgHref
           : `https://www.linkedin.com${card.msgHref}`;
@@ -206,8 +211,21 @@ async function runFollowUps(page, config, results) {
         // Find compose box — LinkedIn may redirect to /messaging/ with overlay
         const replyBox = page.locator('.msg-form__contenteditable[contenteditable="true"]').first();
         if (!await replyBox.isVisible({ timeout: 6000 }).catch(() => false)) {
-          console.log(`[${config.nickname}] Follow-ups — compose box not visible for ${card.name}, skipping`);
-          // Return to connections page for next card
+          console.log(`[${config.nickname}] Follow-ups — compose box not visible for ${card.name}, skipping (already logged)`);
+          await page.goto(CONNECTIONS_URL, { waitUntil: 'domcontentloaded', timeout: 20000 });
+          await sleep(randomBetween(3000, 4000));
+          continue;
+        }
+
+        // Check existing thread — if our most recent message is from us, skip to avoid duplicates
+        const lastMsgSender = await page.evaluate((myName) => {
+          const groups = document.querySelectorAll('.msg-s-message-group__profile-link');
+          if (!groups.length) return null;
+          return groups[groups.length - 1]?.textContent?.trim() || null;
+        }, config.name).catch(() => null);
+
+        if (lastMsgSender === config.name) {
+          console.log(`[${config.nickname}] Follow-ups — we sent last in this thread (${card.name}), skipping to avoid duplicate`);
           await page.goto(CONNECTIONS_URL, { waitUntil: 'domcontentloaded', timeout: 20000 });
           await sleep(randomBetween(3000, 4000));
           continue;
@@ -243,10 +261,6 @@ async function runFollowUps(page, config, results) {
 
         await sendBtn.click({ timeout: 5000 });
         await sleep(randomBetween(1500, 2500));
-
-        // Log to HISTORY.md + update results
-        appendFollowUpToHistory(config.nickname, card.name);
-        alreadyFollowedUp.add(card.name.toLowerCase());
         sent++;
         results.messagessent = (results.messagessent || 0) + 1;
         console.log(`[${config.nickname}] ✅ Follow-up sent to ${card.name} (${sent}/${target})`);
